@@ -6,7 +6,11 @@
   <meta name="theme-color" content="#0b0b0c" />
   <title>Arbeitszeittracker</title>
 
-  <!-- XLSX (SheetJS) for export -->
+  <!-- Favicon / Icon (SVG data URI). Works as browser icon; iOS home-screen icon is best with real PNGs (see comment below). -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='28%25' cy='28%25' r='70%25'%3E%3Cstop offset='0' stop-color='%238bb7ff' stop-opacity='.95'/%3E%3Cstop offset='.7' stop-color='%238bb7ff' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g2' cx='75%25' cy='75%25' r='70%25'%3E%3Cstop offset='0' stop-color='%236ee7b7' stop-opacity='.75'/%3E%3Cstop offset='.7' stop-color='%236ee7b7' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect x='10' y='10' width='108' height='108' rx='28' fill='%230b0b0c'/%3E%3Crect x='10' y='10' width='108' height='108' rx='28' fill='url(%23g1)'/%3E%3Crect x='10' y='10' width='108' height='108' rx='28' fill='url(%23g2)'/%3E%3Cpath d='M40 68h18l6-28 8 56 6-28h20' fill='none' stroke='white' stroke-opacity='.92' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='28%25' cy='28%25' r='70%25'%3E%3Cstop offset='0' stop-color='%238bb7ff' stop-opacity='.95'/%3E%3Cstop offset='.7' stop-color='%238bb7ff' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g2' cx='75%25' cy='75%25' r='70%25'%3E%3Cstop offset='0' stop-color='%236ee7b7' stop-opacity='.75'/%3E%3Cstop offset='.7' stop-color='%236ee7b7' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect x='14' y='14' width='152' height='152' rx='36' fill='%230b0b0c'/%3E%3Crect x='14' y='14' width='152' height='152' rx='36' fill='url(%23g1)'/%3E%3Crect x='14' y='14' width='152' height='152' rx='36' fill='url(%23g2)'/%3E%3Cpath d='M58 96h26l9-42 12 84 9-42h28' fill='none' stroke='white' stroke-opacity='.92' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+
+  <!-- XLSX (SheetJS) for export + import -->
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -406,6 +410,23 @@
       line-height:1.45;
     }
 
+    .split{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+
+    .fileRow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .fileRow input[type=file]{
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.80);
+      border-radius:16px;
+      padding:10px 12px;
+      width:100%;
+      cursor:pointer;
+    }
+
     .dlg-foot{ padding:14px 18px 18px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid rgba(255,255,255,0.10); flex-wrap:wrap; }
 
     @media (max-width:520px){
@@ -539,7 +560,7 @@
       <div class="dlg-head">
         <div>
           <h4>Einstellungen</h4>
-          <p>Stundenlohn wird lokal gespeichert (nur auf diesem Gerät).</p>
+          <p>Stundenlohn & Backups werden lokal verarbeitet.</p>
         </div>
         <button class="xbtn" value="cancel" aria-label="Schließen" type="submit">✕</button>
       </div>
@@ -564,6 +585,29 @@
               <span class="icon" aria-hidden="true">⇩</span>
               Export (.xlsx)
             </button>
+          </div>
+
+          <div class="note">
+            <div style="font-weight:720;letter-spacing:.2px;">Import / Restore</div>
+            <div style="margin-top:4px;color:rgba(255,255,255,0.58);font-size:12px;line-height:1.35;">
+              Importiert eine zuvor exportierte Datei und stellt deinen Stand wieder her.
+              <strong>Achtung:</strong> Standardmäßig werden deine aktuellen Einträge ersetzt.
+            </div>
+            <div class="split" style="margin-top:10px;">
+              <div class="fileRow">
+                <input id="importFile" type="file" accept=".xlsx" />
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+                <button class="btn secondary" id="btnImportMerge" type="button" title="Importieren und anhängen">
+                  <span class="icon" aria-hidden="true">＋</span>
+                  Import (anhängen)
+                </button>
+                <button class="btn primary" id="btnImportReplace" type="button" title="Importieren und ersetzen">
+                  <span class="icon" aria-hidden="true">⟲</span>
+                  Import (ersetzen)
+                </button>
+              </div>
+            </div>
           </div>
 
           <div class="error" id="errorSettings" role="alert"></div>
@@ -610,6 +654,11 @@
     const btnSaveSettings = document.getElementById('btnSaveSettings');
     const btnExport = document.getElementById('btnExport');
 
+    // Import
+    const importFile = document.getElementById('importFile');
+    const btnImportReplace = document.getElementById('btnImportReplace');
+    const btnImportMerge = document.getElementById('btnImportMerge');
+
     const fmtEUR = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
     const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
 
@@ -626,6 +675,13 @@
       const hh = Math.floor(m / 60);
       const mm = m % 60;
       return `${pad2(hh)}:${pad2(mm)}`;
+    }
+
+    function weekdayTitleFromISO(iso){
+      const dt = new Date(iso + 'T00:00:00');
+      const weekday = new Intl.DateTimeFormat('de-DE', { weekday:'long' }).format(dt);
+      const date = new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).format(dt);
+      return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} · ${date}`;
     }
 
     function todayTitle(){
@@ -667,6 +723,31 @@
       const v = Number(normalized);
       if(!Number.isFinite(v) || v < 0) return null;
       return v;
+    }
+
+    function parseDateDE(value){
+      // accepts: DD.MM.YYYY or DD-MM-YYYY or YYYY-MM-DD
+      const s = String(value ?? '').trim();
+      if(!s) return null;
+      let m = s.match(/^\s*(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\s*$/);
+      if(m){
+        const dd = m[1], mm = m[2], yyyy = m[3];
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      m = s.match(/^\s*(\d{4})-(\d{2})-(\d{2})\s*$/);
+      if(m){
+        return `${m[1]}-${m[2]}-${m[3]}`;
+      }
+      // Excel date (number)
+      if(typeof value === 'number' && Number.isFinite(value)){
+        // Excel serial date to JS date (SheetJS uses 1900 system by default)
+        const dt = new Date(Math.round((value - 25569) * 86400 * 1000));
+        const yyyy = dt.getUTCFullYear();
+        const mm = pad2(dt.getUTCMonth()+1);
+        const dd = pad2(dt.getUTCDate());
+        return `${yyyy}-${mm}-${dd}`;
+      }
+      return null;
     }
 
     function uid(){ return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -808,7 +889,7 @@
 
           const t = document.createElement('div');
           t.className = 'date';
-          t.textContent = d.title || 'Arbeitstag';
+          t.textContent = d.title || weekdayTitleFromISO(d.isoDate || todayISO());
 
           const meta = document.createElement('div');
           meta.className = 'meta';
@@ -899,10 +980,11 @@
       if(dur === 0) return showError(elError, 'Start und Ende ergeben 0 Minuten. Beispiel Nachtschicht: 22:00–06:00.');
       if(breakMin > dur) return showError(elError, 'Die Pausenzeit kann nicht größer sein als die (berechnete) Arbeitsdauer.');
 
+      const iso = todayISO();
       const day = {
         id: uid(),
-        isoDate: todayISO(),
-        title: todayTitle(),
+        isoDate: iso,
+        title: weekdayTitleFromISO(iso),
         startMin,
         endMin,
         breakMin,
@@ -929,6 +1011,7 @@
       elHourlyNote.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
         ? `Aktuell: ${fmtEUR.format(hourlyRate)} pro Stunde`
         : 'Aktuell: — (nicht gesetzt)';
+      importFile.value = '';
       openDialog(dlgSettings);
       setTimeout(()=>elHourly.focus(), 60);
     }
@@ -966,7 +1049,6 @@
     function exportXLSX(){
       clearError(elErrorSettings);
 
-      // SheetJS loaded?
       const XLSX = window.XLSX;
       if(!XLSX){
         return showError(elErrorSettings, 'Export-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
@@ -979,10 +1061,8 @@
         return showError(elErrorSettings, 'Keine Daten zum Exportieren vorhanden.');
       }
 
-      // sort newest first
       days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
 
-      // group by month
       const groups = new Map();
       for(const d of days){
         const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
@@ -991,7 +1071,6 @@
       }
       const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
 
-      // helper
       const fmtDate = (iso) => {
         if(!iso || iso.length < 10) return '';
         const dt = new Date(iso + 'T00:00:00');
@@ -1004,7 +1083,6 @@
         return w.charAt(0).toUpperCase() + w.slice(1);
       };
 
-      // Build sheet rows (months as section headers)
       const rows = [];
       rows.push([
         'Monat', 'Datum', 'Wochentag', 'Start', 'Ende', 'Zeitspanne', 'Pause', 'Dauer', 'Netto', 'Stundenlohn', 'Einkommen'
@@ -1024,7 +1102,6 @@
           monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
         }
 
-        // blank separator (makes it readable in Excel)
         rows.push(['']);
         rows.push([monthName]);
 
@@ -1062,11 +1139,9 @@
         ]);
       }
 
-      // Create workbook
       const wb = XLSX.utils.book_new();
 
       const ws1 = XLSX.utils.aoa_to_sheet(rows);
-      // Try some reasonable column widths
       ws1['!cols'] = [
         { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 8 }, { wch: 9 }, { wch: 9 }, { wch: 11 }, { wch: 12 }
       ];
@@ -1078,7 +1153,6 @@
       ];
       XLSX.utils.book_append_sheet(wb, ws2, 'Monate');
 
-      // File name: export_azt_DATUMDESEXPORTS
       const now = new Date();
       const dd = pad2(now.getDate());
       const mm = pad2(now.getMonth()+1);
@@ -1086,6 +1160,200 @@
       const fileName = `export_azt_${dd}-${mm}-${yyyy}.xlsx`;
 
       XLSX.writeFile(wb, fileName);
+    }
+
+    function normalizeImportedDays(imported){
+      // de-duplicate: same isoDate + start + end + break
+      const seen = new Set();
+      const out = [];
+      for(const d of imported){
+        const key = `${d.isoDate}|${d.startMin}|${d.endMin}|${d.breakMin||0}`;
+        if(seen.has(key)) continue;
+        seen.add(key);
+        out.push(d);
+      }
+      return out;
+    }
+
+    function readSheetAsAOA(wb, preferredName){
+      const XLSX = window.XLSX;
+      if(!XLSX) return null;
+      const name = wb.SheetNames.find(n => n.toLowerCase() === String(preferredName).toLowerCase()) || wb.SheetNames[0];
+      const ws = wb.Sheets[name];
+      if(!ws) return null;
+      // raw=true keeps numbers; defval="" keeps empty strings
+      return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    }
+
+    function findHeaderRow(aoa){
+      for(let r=0;r<Math.min(aoa.length, 40);r++){
+        const row = aoa[r].map(x => String(x||'').trim().toLowerCase());
+        if(row.includes('datum') && row.includes('start') && row.includes('ende')) return r;
+      }
+      return -1;
+    }
+
+    function extractHourlyRateFromWorkbook(wb){
+      const XLSX = window.XLSX;
+      if(!XLSX) return null;
+
+      // Prefer sheet "Monate" if exists
+      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'monate');
+      if(sheetName){
+        const ws = wb.Sheets[sheetName];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+        if(aoa && aoa.length){
+          const headerIdx = findHeaderRow(aoa) !== -1 ? findHeaderRow(aoa) : 0;
+          const header = (aoa[headerIdx]||[]).map(x => String(x||'').trim().toLowerCase());
+          const col = header.indexOf('stundenlohn');
+          if(col !== -1){
+            for(let i=headerIdx+1;i<aoa.length;i++){
+              const v = aoa[i]?.[col];
+              if(typeof v === 'number' && Number.isFinite(v)) return v;
+              const parsed = parseMoney(v);
+              if(parsed !== null) return parsed;
+            }
+          }
+        }
+      }
+
+      // Fallback: scan "Arbeitstage" for first valid hourly
+      const sheetName2 = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage');
+      if(sheetName2){
+        const ws = wb.Sheets[sheetName2];
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+        const h = findHeaderRow(aoa);
+        if(h !== -1){
+          const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
+          const col = header.indexOf('stundenlohn');
+          if(col !== -1){
+            for(let i=h+1;i<aoa.length;i++){
+              const v = aoa[i]?.[col];
+              if(typeof v === 'number' && Number.isFinite(v)) return v;
+              const parsed = parseMoney(v);
+              if(parsed !== null) return parsed;
+            }
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function importFromWorkbook(wb){
+      const XLSX = window.XLSX;
+      if(!XLSX) throw new Error('Import-Library nicht geladen');
+
+      // Read Arbeitstage
+      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage') || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+      if(!aoa || !aoa.length) throw new Error('Leere Datei');
+
+      const h = findHeaderRow(aoa);
+      if(h === -1) throw new Error('Konnte keine Header-Zeile finden (Datum/Start/Ende).');
+
+      const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
+      const col = {
+        month: header.indexOf('monat'),
+        date: header.indexOf('datum'),
+        weekday: header.indexOf('wochentag'),
+        start: header.indexOf('start'),
+        end: header.indexOf('ende'),
+        pause: header.indexOf('pause'),
+      };
+
+      if(col.date === -1 || col.start === -1 || col.end === -1){
+        throw new Error('Spalten fehlen (Datum/Start/Ende).');
+      }
+
+      const imported = [];
+      for(let r=h+1;r<aoa.length;r++){
+        const row = aoa[r] || [];
+        // skip separators / month title rows
+        const rawDate = row[col.date];
+        const iso = parseDateDE(rawDate);
+        if(!iso) continue;
+
+        const startStr = row[col.start];
+        const endStr = row[col.end];
+        const pauseStr = col.pause !== -1 ? row[col.pause] : '';
+
+        const startMin = (typeof startStr === 'number') ? Math.round(startStr * 1440) : parseHHMM(startStr, { allowEmpty:false });
+        const endMin = (typeof endStr === 'number') ? Math.round(endStr * 1440) : parseHHMM(endStr, { allowEmpty:false });
+        const breakMin = (typeof pauseStr === 'number') ? Math.round(pauseStr * 1440) : parseHHMM(pauseStr, { allowEmpty:true });
+
+        if(startMin === null || endMin === null || breakMin === null) continue;
+
+        const d = {
+          id: uid(),
+          isoDate: iso,
+          title: weekdayTitleFromISO(iso),
+          startMin,
+          endMin,
+          breakMin,
+        };
+        imported.push(d);
+      }
+
+      if(imported.length === 0) throw new Error('Keine gültigen Arbeitstage gefunden.');
+
+      return normalizeImportedDays(imported);
+    }
+
+    async function doImport(mode /* 'replace' | 'merge' */){
+      clearError(elErrorSettings);
+
+      const XLSX = window.XLSX;
+      if(!XLSX){
+        return showError(elErrorSettings, 'Import-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
+      }
+
+      const file = importFile.files && importFile.files[0];
+      if(!file){
+        return showError(elErrorSettings, 'Bitte wähle zuerst eine .xlsx Datei aus.');
+      }
+
+      try{
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+
+        const importedDays = importFromWorkbook(wb);
+
+        // hourly rate handling
+        const importedRate = extractHourlyRateFromWorkbook(wb);
+        if(importedRate !== null){
+          const cur = loadSettings().hourlyRate;
+          if(cur === null || Math.abs(cur - importedRate) > 0.0001){
+            const ok = confirm(`Stundenlohn aus Datei übernehmen?\n\nDatei: ${importedRate} €/h\nAktuell: ${cur ?? '—'} €/h`);
+            if(ok){
+              saveSettings({ hourlyRate: importedRate });
+              updateSubtitle();
+            }
+          }
+        }
+
+        if(mode === 'replace'){
+          const ok = confirm(`Import (ersetzen): Dadurch werden deine aktuellen Einträge gelöscht und durch ${importedDays.length} Einträge aus der Datei ersetzt. Fortfahren?`);
+          if(!ok) return;
+          saveDays(importedDays);
+        } else {
+          // merge
+          const existing = loadDays();
+          const merged = normalizeImportedDays(existing.concat(importedDays));
+          saveDays(merged);
+        }
+
+        render();
+        importFile.value = '';
+        showError(elErrorSettings, `✅ Import erfolgreich (${importedDays.length} Einträge).`);
+        // turn green-ish by tweaking border with inline style (small UX)
+        elErrorSettings.style.borderColor = 'rgba(110,231,183,0.28)';
+        elErrorSettings.style.background = 'rgba(110,231,183,0.10)';
+
+      } catch (e){
+        showError(elErrorSettings, `Import fehlgeschlagen: ${e?.message || e}`);
+      }
     }
 
     smartTimeInput(elStart);
@@ -1099,7 +1367,10 @@
 
     btnSettings.addEventListener('click', openSettings);
     btnSaveSettings.addEventListener('click', saveSettingsFromDialog);
+
     btnExport.addEventListener('click', exportXLSX);
+    btnImportReplace.addEventListener('click', () => doImport('replace'));
+    btnImportMerge.addEventListener('click', () => doImport('merge'));
 
     document.getElementById('form').addEventListener('keydown', (e) => {
       if(e.key === 'Enter'){ e.preventDefault(); saveWorkday(); }
@@ -1110,10 +1381,19 @@
     });
 
     dlg.addEventListener('close', () => clearError(elError));
-    dlgSettings.addEventListener('close', () => clearError(elErrorSettings));
+    dlgSettings.addEventListener('close', () => {
+      // reset success styling
+      elErrorSettings.style.borderColor = 'rgba(251,113,133,0.28)';
+      elErrorSettings.style.background = 'rgba(251,113,133,0.10)';
+      clearError(elErrorSettings);
+    });
 
     updateSubtitle();
     render();
+
+    // NOTE: For a *perfect* iPhone Home-Screen icon, add real PNG files and set:
+    // <link rel="apple-touch-icon" href="/icons/icon-180.png">
+    // plus a manifest.json with 192/512 icons.
   </script>
 </body>
 </html>
