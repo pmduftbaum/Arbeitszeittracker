@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0b0b0c" />
   <title>Arbeitszeittracker</title>
+
+  <!-- XLSX (SheetJS) for export -->
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
   <style>
     :root{
       --bg:#0b0b0c;
@@ -402,7 +406,7 @@
       line-height:1.45;
     }
 
-    .dlg-foot{ padding:14px 18px 18px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid rgba(255,255,255,0.10); }
+    .dlg-foot{ padding:14px 18px 18px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid rgba(255,255,255,0.10); flex-wrap:wrap; }
 
     @media (max-width:520px){
       .topbar-inner{ padding:0 14px; }
@@ -546,7 +550,22 @@
             <label for="hourly">Stundenlohn (EUR)</label>
             <input id="hourly" name="hourly" inputmode="decimal" autocomplete="off" placeholder="z.B. 18,50" />
           </div>
+
           <div class="note" id="hourlyNote">Aktuell: —</div>
+
+          <div class="note" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:720;letter-spacing:.2px;">Backup / Export</div>
+              <div style="margin-top:4px;color:rgba(255,255,255,0.58);font-size:12px;line-height:1.35;">
+                Exportiert alle Arbeitstage (nach Monaten) als Excel (.xlsx).
+              </div>
+            </div>
+            <button class="btn secondary" id="btnExport" type="button" title="Excel Export">
+              <span class="icon" aria-hidden="true">⇩</span>
+              Export (.xlsx)
+            </button>
+          </div>
+
           <div class="error" id="errorSettings" role="alert"></div>
         </div>
       </div>
@@ -589,6 +608,7 @@
     const elHourlyNote = document.getElementById('hourlyNote');
     const elErrorSettings = document.getElementById('errorSettings');
     const btnSaveSettings = document.getElementById('btnSaveSettings');
+    const btnExport = document.getElementById('btnExport');
 
     const fmtEUR = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
     const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
@@ -943,6 +963,131 @@
       });
     }
 
+    function exportXLSX(){
+      clearError(elErrorSettings);
+
+      // SheetJS loaded?
+      const XLSX = window.XLSX;
+      if(!XLSX){
+        return showError(elErrorSettings, 'Export-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
+      }
+
+      const days = loadDays();
+      const { hourlyRate } = loadSettings();
+
+      if(days.length === 0){
+        return showError(elErrorSettings, 'Keine Daten zum Exportieren vorhanden.');
+      }
+
+      // sort newest first
+      days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
+
+      // group by month
+      const groups = new Map();
+      for(const d of days){
+        const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
+        if(!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(d);
+      }
+      const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
+
+      // helper
+      const fmtDate = (iso) => {
+        if(!iso || iso.length < 10) return '';
+        const dt = new Date(iso + 'T00:00:00');
+        return new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).format(dt);
+      };
+      const fmtWeekday = (iso) => {
+        if(!iso || iso.length < 10) return '';
+        const dt = new Date(iso + 'T00:00:00');
+        const w = new Intl.DateTimeFormat('de-DE', { weekday:'long' }).format(dt);
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      };
+
+      // Build sheet rows (months as section headers)
+      const rows = [];
+      rows.push([
+        'Monat', 'Datum', 'Wochentag', 'Start', 'Ende', 'Zeitspanne', 'Pause', 'Dauer', 'Netto', 'Stundenlohn', 'Einkommen'
+      ]);
+
+      const summaryRows = [];
+      summaryRows.push(['Monat', 'Einträge', 'Netto (hh:mm)', 'Netto (Stunden)', 'Stundenlohn', 'Einkommen']);
+
+      for(const key of keys){
+        const list = groups.get(key) || [];
+        let monthNetMin = 0;
+
+        let monthName = 'Unbekannter Monat';
+        if(key !== '0000-00'){
+          const dt = new Date(`${key}-01T00:00:00`);
+          monthName = fmtMonth.format(dt);
+          monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+        }
+
+        // blank separator (makes it readable in Excel)
+        rows.push(['']);
+        rows.push([monthName]);
+
+        for(const d of list){
+          const dur = durationMin(d);
+          const net = netMin(d);
+          monthNetMin += net;
+
+          const span = `${formatClock(d.startMin ?? 0)}–${formatClock(d.endMin ?? 0)}`;
+          const income = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? moneyForMinutes(net, hourlyRate) : '';
+
+          rows.push([
+            monthName,
+            fmtDate(d.isoDate),
+            fmtWeekday(d.isoDate),
+            formatClock(d.startMin ?? 0),
+            formatClock(d.endMin ?? 0),
+            span,
+            formatMinutes(d.breakMin || 0),
+            formatMinutes(dur),
+            formatMinutes(net),
+            (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? hourlyRate : '',
+            income
+          ]);
+        }
+
+        const monthIncome = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? moneyForMinutes(monthNetMin, hourlyRate) : '';
+        summaryRows.push([
+          monthName,
+          list.length,
+          formatMinutes(monthNetMin),
+          monthNetMin / 60,
+          (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? hourlyRate : '',
+          monthIncome
+        ]);
+      }
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      const ws1 = XLSX.utils.aoa_to_sheet(rows);
+      // Try some reasonable column widths
+      ws1['!cols'] = [
+        { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 8 }, { wch: 9 }, { wch: 9 }, { wch: 11 }, { wch: 12 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws1, 'Arbeitstage');
+
+      const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
+      ws2['!cols'] = [
+        { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws2, 'Monate');
+
+      // File name: export_azt_DATUMDESEXPORTS
+      const now = new Date();
+      const dd = pad2(now.getDate());
+      const mm = pad2(now.getMonth()+1);
+      const yyyy = now.getFullYear();
+      const fileName = `export_azt_${dd}-${mm}-${yyyy}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+    }
+
     smartTimeInput(elStart);
     smartTimeInput(elEnd);
     smartTimeInput(elBreak);
@@ -954,6 +1099,7 @@
 
     btnSettings.addEventListener('click', openSettings);
     btnSaveSettings.addEventListener('click', saveSettingsFromDialog);
+    btnExport.addEventListener('click', exportXLSX);
 
     document.getElementById('form').addEventListener('keydown', (e) => {
       if(e.key === 'Enter'){ e.preventDefault(); saveWorkday(); }
