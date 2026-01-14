@@ -2,106 +2,972 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0b0b0c" />
   <title>Arbeitszeittracker</title>
   <style>
     :root{
-      --bg:#0b0b0c;--stroke:rgba(255,255,255,.1);--text:rgba(255,255,255,.92);
-      --muted:rgba(255,255,255,.62);--muted2:rgba(255,255,255,.44);
-      --shadow:0 20px 60px rgba(0,0,0,.4);--r-xl:24px;--container:980px;--blur:18px
+      --bg:#0b0b0c;
+      --stroke:rgba(255,255,255,0.10);
+      --text:rgba(255,255,255,0.92);
+      --muted:rgba(255,255,255,0.62);
+      --muted2:rgba(255,255,255,0.44);
+      --shadow:0 20px 60px rgba(0,0,0,0.40);
+      --r-xl:24px;
+      --container:980px;
+      --blur:18px;
     }
-    html{-webkit-text-size-adjust:100%}
-    *{box-sizing:border-box} html,body{height:100%}
-    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text";
-      color:var(--text);background:var(--bg);position:relative}
 
-    /* iOS scroll seam fix: render gradients on a fixed layer */
-    body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+
+    /* Seam-Fix: auch beim Overscroll immer gleiche Basisfarbe */
+    html{ background: var(--bg); }
+
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background-color: var(--bg);
       background:
-        radial-gradient(1200px 900px at 15% 10%,rgba(139,183,255,.22),transparent 55%),
-        radial-gradient(900px 700px at 80% 15%,rgba(110,231,183,.12),transparent 55%),
-        radial-gradient(1200px 900px at 55% 110%,rgba(251,113,133,.1),transparent 50%),
+        radial-gradient(1200px 900px at 15% 10%, rgba(139,183,255,0.22), transparent 55%),
+        radial-gradient(900px 700px at 80% 15%, rgba(110,231,183,0.12), transparent 55%),
+        radial-gradient(1200px 900px at 55% 110%, rgba(251,113,133,0.10), transparent 50%),
         var(--bg);
-      transform:translateZ(0);
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+      overflow-x:hidden;
     }
-    .wrap{max-width:var(--container);margin:0 auto;padding:36px 18px 64px}
-    .topbar{position:sticky;top:0;z-index:20;padding:14px 0;backdrop-filter:blur(var(--blur))}
-    .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:0 18px}
-    .left{display:flex;align-items:center;gap:12px}
-    .iconbtn{width:40px;height:40px;border-radius:16px;border:1px solid var(--stroke);background:rgba(255,255,255,.06);color:var(--text);cursor:pointer}
-    .brand{display:flex;gap:12px;align-items:center}
-    .logo{width:38px;height:38px;border-radius:14px;background:rgba(255,255,255,.08);border:1px solid var(--stroke)}
-    .brand h1{margin:0;font-size:18px;font-weight:650}
-    .brand p{margin:2px 0 0;font-size:12px;color:var(--muted)}
-    .right{display:flex;gap:10px}
-    .pill{display:flex;flex-direction:column;align-items:flex-end}
-    .pill .label{font-size:11px;color:var(--muted2)}
-    .pill .value{padding:10px 12px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--stroke);min-width:120px;text-align:center;font-weight:650}
-    .hero{display:grid;gap:14px;padding:30px 0}
-    .hero h2{margin:0;font-size:clamp(28px,5vw,44px);font-weight:720}
-    .hero p{margin:0;color:var(--muted)}
-    .btn{border-radius:999px;padding:12px 14px;border:1px solid var(--stroke);background:rgba(255,255,255,.07);color:var(--text);cursor:pointer}
-    .btn.primary{background:linear-gradient(135deg,rgba(139,183,255,.26),rgba(255,255,255,.08))}
-    .section{margin-top:22px;padding:18px;border-radius:var(--r-xl);background:rgba(255,255,255,.06);border:1px solid var(--stroke)}
-    .days{display:grid;gap:14px}
-    .month{padding:14px;border-radius:20px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.04)}
-    .month-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px}
-    .month-title .name{font-size:14px;font-weight:700}
-    .month-title .sub{font-size:11px;color:var(--muted2)}
-    .chip{padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.12)}
-    .day{padding:14px;border-radius:16px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);display:grid;grid-template-columns:1fr auto;gap:12px}
-    .day .meta{font-size:12px;color:var(--muted)}
-    .badge{padding:6px 10px;border-radius:999px;font-size:12px;border:1px solid rgba(255,255,255,.12);text-align:center}
-    dialog{border:none;border-radius:20px;background:rgba(20,20,22,.9);color:var(--text)}
 
-    /* iOS input zoom fix: inputs >= 16px */
-    input{font-size:16px}
+    .wrap{ max-width:var(--container); margin:0 auto; padding:36px 18px 64px; }
+
+    /* Topbar */
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:20;
+      padding:14px 0;
+      backdrop-filter: blur(var(--blur));
+      -webkit-backdrop-filter: blur(var(--blur));
+    }
+    .topbar-inner{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      max-width:var(--container);
+      margin:0 auto;
+      padding:0 18px;
+    }
+
+    .left{ display:flex; align-items:center; gap:12px; min-width:0; }
+
+    .iconbtn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      width:40px;
+      height:40px;
+      border-radius:16px;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow:0 18px 45px rgba(0,0,0,0.30);
+      flex:0 0 auto;
+    }
+    .iconbtn:hover{ transform:translateY(-1px); background:rgba(255,255,255,0.10); border-color:rgba(255,255,255,0.18); }
+    .iconbtn:active{ transform:translateY(0) scale(0.98); }
+
+    .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+    .logo{
+      width:38px; height:38px; border-radius:14px;
+      background:
+        radial-gradient(18px 18px at 30% 30%, rgba(139,183,255,0.85), transparent 60%),
+        radial-gradient(18px 18px at 70% 70%, rgba(110,231,183,0.65), transparent 60%),
+        rgba(255,255,255,0.08);
+      border:1px solid var(--stroke);
+      box-shadow:0 10px 30px rgba(0,0,0,0.25);
+      position:relative;
+      overflow:hidden;
+      flex:0 0 auto;
+    }
+    .logo::after{
+      content:"";
+      position:absolute;
+      inset:-30%;
+      background: conic-gradient(from 160deg, rgba(139,183,255,0.18), rgba(110,231,183,0.16), rgba(251,113,133,0.10), rgba(139,183,255,0.18));
+      filter: blur(10px);
+      transform: rotate(8deg);
+    }
+
+    .brand-text{ min-width:0; }
+    .brand h1{
+      margin:0;
+      font-size:18px;
+      letter-spacing:0.2px;
+      line-height:1.1;
+      font-weight:650;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .brand p{
+      margin:3px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .right{ display:flex; align-items:flex-end; gap:10px; flex:0 0 auto; }
+    .pill{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+    .pill .label{ font-size:11px; color:var(--muted2); letter-spacing:0.2px; white-space:nowrap; }
+    .pill .value{
+      padding:10px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,0.07);
+      border:1px solid var(--stroke);
+      box-shadow:0 18px 45px rgba(0,0,0,0.30);
+      min-width:124px;
+      text-align:center;
+      font-variant-numeric: tabular-nums;
+      font-weight:650;
+      letter-spacing:0.2px;
+    }
+
+    /* Hero */
+    .hero{ padding:34px 0 10px; display:grid; gap:14px; }
+    .hero h2{ margin:0; font-size: clamp(28px, 5vw, 44px); line-height:1.08; letter-spacing:-0.6px; font-weight:720; }
+    .hero p{ margin:0; max-width:66ch; color:var(--muted); font-size:15px; line-height:1.55; }
+
+    .actions{ margin-top:12px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+
+    .btn{
+      appearance:none;
+      border:1px solid var(--stroke);
+      background:rgba(255,255,255,0.07);
+      color:var(--text);
+      padding:12px 14px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:650;
+      letter-spacing:0.2px;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      box-shadow:0 18px 45px rgba(0,0,0,0.30);
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+      user-select:none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:hover{ transform:translateY(-1px); background:rgba(255,255,255,0.10); border-color:rgba(255,255,255,0.16); }
+    .btn:active{ transform:translateY(0) scale(0.99); }
+    .btn.primary{ background: linear-gradient(135deg, rgba(139,183,255,0.26), rgba(255,255,255,0.08)); border-color: rgba(139,183,255,0.28); }
+    .btn.secondary{ background: rgba(255,255,255,0.06); }
+
+    .icon{
+      width:18px; height:18px;
+      display:inline-grid;
+      place-items:center;
+      border-radius:999px;
+      background:rgba(255,255,255,0.10);
+      border:1px solid rgba(255,255,255,0.12);
+    }
+
+    /* Section */
+    .section{
+      margin-top:22px;
+      padding:18px;
+      border-radius:var(--r-xl);
+      background:rgba(255,255,255,0.06);
+      border:1px solid var(--stroke);
+      box-shadow:var(--shadow);
+    }
+    .section-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .section-head h3{ margin:0; font-size:14px; color:rgba(255,255,255,0.86); letter-spacing:0.3px; font-weight:700; }
+    .hint{ font-size:12px; color:var(--muted2); line-height:1.4; }
+
+    /* List */
+    .days{ display:grid; gap: 10px; }
+
+    .month{
+      display:grid;
+      gap:10px;
+      padding:14px;
+      border-radius:22px;
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+    }
+
+    .month-head{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:10px;
+      padding:4px 4px 8px;
+    }
+
+    .month-title{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .month-title .name{
+      margin:0;
+      font-size:13px;
+      font-weight:760;
+      letter-spacing:0.2px;
+      color:rgba(255,255,255,0.86);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .month-title .sub{ font-size:11px; color:rgba(255,255,255,0.44); letter-spacing:0.2px; }
+
+    .month-sums{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+
+    .chip{
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05);
+      font-size:12px;
+      font-variant-numeric: tabular-nums;
+      font-weight:650;
+      letter-spacing:0.2px;
+      white-space:nowrap;
+    }
+    .chip.ok{ border-color: rgba(110,231,183,0.22); background: rgba(110,231,183,0.10); }
+    .chip.money{ border-color: rgba(139,183,255,0.26); background: rgba(139,183,255,0.10); }
+
+    .month-days{ display:grid; gap:10px; }
+
+    .day{
+      padding:14px;
+      border-radius:18px;
+      background:rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.10);
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:12px;
+      transition: transform .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .day:hover{ transform:translateY(-1px); background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.14); }
+
+    .day-title{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+    .day-title .date{ font-weight:720; letter-spacing:0.2px; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .day-title .meta{ font-size:12px; color:var(--muted); font-variant-numeric: tabular-nums; display:flex; gap:10px; flex-wrap:wrap; }
+
+    .rightcol{ display:grid; gap:8px; justify-items:end; }
+
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05);
+      font-size:12px;
+      font-variant-numeric: tabular-nums;
+      font-weight:650;
+      letter-spacing:0.2px;
+      min-width:124px;
+      text-align:center;
+      white-space:nowrap;
+    }
+    .badge.ok{ border-color: rgba(110,231,183,0.22); background: rgba(110,231,183,0.10); }
+    .badge.money{ border-color: rgba(139,183,255,0.26); background: rgba(139,183,255,0.10); }
+
+    .empty{
+      padding:22px;
+      border-radius:18px;
+      border:1px dashed rgba(255,255,255,0.18);
+      color:var(--muted);
+      text-align:center;
+      line-height:1.55;
+    }
+
+    /* FAB */
+    .fab{
+      position:fixed;
+      right:18px;
+      bottom:18px;
+      width:56px;
+      height:56px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,0.14);
+      background: linear-gradient(135deg, rgba(139,183,255,0.28), rgba(255,255,255,0.08));
+      box-shadow: 0 26px 60px rgba(0,0,0,0.55);
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      transition: transform .18s ease, filter .18s ease;
+      -webkit-tap-highlight-color: transparent;
+      z-index:30;
+    }
+    .fab:hover{ transform:translateY(-2px); filter:brightness(1.05); }
+    .fab:active{ transform:translateY(0) scale(0.98); }
+
+    /* Dialog */
+    dialog{
+      width:min(560px, calc(100% - 36px));
+      border:1px solid rgba(255,255,255,0.14);
+      border-radius:24px;
+      padding:0;
+      background: rgba(20,20,22,0.86);
+      color:var(--text);
+      box-shadow: 0 30px 90px rgba(0,0,0,0.70);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+      overflow:hidden;
+      transform: translateY(8px);
+      opacity: 0;
+      animation: pop .18s ease forwards;
+    }
+    @keyframes pop{ to{ transform: translateY(0); opacity: 1; } }
+    dialog::backdrop{ background: rgba(0,0,0,0.55); }
+
+    .dlg-head{
+      padding:18px 18px 14px;
+      border-bottom:1px solid rgba(255,255,255,0.10);
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .dlg-head h4{ margin:0; font-size:14px; font-weight:760; letter-spacing:0.2px; }
+    .dlg-head p{ margin:6px 0 0; font-size:12px; color:var(--muted); line-height:1.45; }
+
+    .xbtn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color:var(--text);
+      width:36px;
+      height:36px;
+      border-radius:14px;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      transition: transform .18s ease, background .18s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .xbtn:hover{ background: rgba(255,255,255,0.10); transform: translateY(-1px); }
+    .xbtn:active{ transform: translateY(0) scale(0.98); }
+
+    .dlg-body{ padding:16px 18px 10px; }
+    .grid{ display:grid; gap:12px; grid-template-columns:1fr; }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    .field{ display:grid; gap:8px; }
+    label{ font-size:12px; color:rgba(255,255,255,0.74); letter-spacing:0.2px; }
+
+    input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      color:var(--text);
+      font-size:14px;
+      outline:none;
+      transition: border-color .18s ease, background .18s ease;
+      font-variant-numeric: tabular-nums;
+    }
+    input:focus{ border-color: rgba(139,183,255,0.34); background: rgba(255,255,255,0.08); }
+
+    /* iOS-Zoom Fix: iPhone Safari zoomt bei input < 16px */
+    @supports (-webkit-touch-callout: none) {
+      input{ font-size:16px; }
+    }
+
+    .note{
+      font-size:12px;
+      color:var(--muted2);
+      line-height:1.45;
+      padding:10px 12px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+    }
+
+    .error{
+      display:none;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:16px;
+      border:1px solid rgba(251,113,133,0.28);
+      background: rgba(251,113,133,0.10);
+      color:var(--text);
+      font-size:12px;
+      line-height:1.45;
+    }
+
+    .dlg-foot{ padding:14px 18px 18px; display:flex; gap:10px; justify-content:flex-end; border-top:1px solid rgba(255,255,255,0.10); }
+
+    @media (max-width:520px){
+      .topbar-inner{ padding:0 14px; }
+      .wrap{ padding:26px 14px 88px; }
+      .row{ grid-template-columns:1fr; }
+      .pill .value{ min-width:108px; padding:10px 10px; }
+      .right{ gap:8px; }
+      .fab{ right:14px; bottom:14px; }
+    }
+
+    @media (prefers-reduced-motion: reduce){ *{ transition:none !important; animation:none !important; } }
   </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="left">
-      <button class="iconbtn" id="btnSettings">⚙️</button>
-      <div class="brand"><div class="logo"></div><div><h1>Arbeitszeittracker</h1><p id="subtitle">Minimal. Präzise. Unter Kontrolle.</p></div></div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="left">
+        <button class="iconbtn" id="btnSettings" aria-label="Einstellungen" title="Einstellungen">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="rgba(255,255,255,0.92)" stroke-width="2"/>
+            <path d="M19.4 15a1.9 1.9 0 0 0 .38 2.1l.05.05a2.3 2.3 0 0 1-1.63 3.93 2.3 2.3 0 0 1-1.62-.67l-.05-.05a1.9 1.9 0 0 0-2.1-.38 1.9 1.9 0 0 0-1.12 1.74V22a2.3 2.3 0 0 1-4.6 0v-.07a1.9 1.9 0 0 0-1.12-1.74 1.9 1.9 0 0 0-2.1.38l-.05.05a2.3 2.3 0 1 1-3.25-3.25l.05-.05A1.9 1.9 0 0 0 3 15a1.9 1.9 0 0 0-1.74-1.12H1.2a2.3 2.3 0 0 1 0-4.6h.07A1.9 1.9 0 0 0 3 7.16a1.9 1.9 0 0 0-.38-2.1l-.05-.05A2.3 2.3 0 1 1 5.82 1.8l.05.05A1.9 1.9 0 0 0 7.97 2.23 1.9 1.9 0 0 0 9.1.5V.43a2.3 2.3 0 0 1 4.6 0V.5a1.9 1.9 0 0 0 1.12 1.74 1.9 1.9 0 0 0 2.1-.38l.05-.05a2.3 2.3 0 1 1 3.25 3.25l-.05.05a1.9 1.9 0 0 0-.38 2.1 1.9 1.9 0 0 0 1.74 1.12h.07a2.3 2.3 0 0 1 0 4.6h-.07A1.9 1.9 0 0 0 19.4 15Z" stroke="rgba(255,255,255,0.92)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+          </svg>
+        </button>
+
+        <div class="brand" aria-label="Arbeitszeittracker">
+          <div class="logo" aria-hidden="true"></div>
+          <div class="brand-text">
+            <h1>Arbeitszeittracker</h1>
+            <p id="subtitle">Minimal. Präzise. Unter Kontrolle.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="right" aria-label="Summen">
+        <div class="pill">
+          <div class="label">Gesamt (netto)</div>
+          <div class="value" id="sumTotal">0:00</div>
+        </div>
+        <div class="pill">
+          <div class="label">Gesamt (€)</div>
+          <div class="value" id="sumMoney">0,00 €</div>
+        </div>
+      </div>
     </div>
-    <div class="right">
-      <div class="pill"><div class="label">Gesamt (netto)</div><div class="value" id="sumTime">0:00</div></div>
-      <div class="pill"><div class="label">Gesamt (€)</div><div class="value" id="sumMoney">0,00 €</div></div>
-    </div>
-  </div>
-</header>
-<main class="wrap">
-  <section class="hero"><h2>Arbeitszeit im Blick.</h2><p>Start–Ende, Pause, Monatsübersicht & Verdienst.</p><button class="btn primary" id="btnAdd">+ Neuer Tag</button></section>
-  <section class="section"><div class="days" id="days"></div></section>
-</main>
+  </header>
 
-<dialog id="dlgSettings"><form method="dialog"><h3>Stundenlohn</h3><input id="hourly" placeholder="z.B. 18,50"><button id="saveSettings">Speichern</button></form></dialog>
-<dialog id="dlgDay"><form method="dialog"><input id="start" placeholder="Start hh:mm"><input id="end" placeholder="Ende hh:mm"><input id="pause" placeholder="Pause hh:mm"><button id="saveDay">Speichern</button></form></dialog>
+  <main class="wrap">
+    <section class="hero">
+      <h2>Dein Arbeitstag. Eintrag in Sekunden.</h2>
+      <p>
+        Trage <strong>Start</strong> und <strong>Ende</strong> ein. Daraus wird die Dauer berechnet – anschließend wird die <strong>Pause</strong> abgezogen.
+        Hinterlege deinen <strong>Stundenlohn</strong>, um direkt dein verdientes Geld zu sehen.
+      </p>
 
-<script>
-const DS='days.v3', SS='settings.v1';
-const fmtE=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'});
-const daysEl=document.getElementById('days'), sumT=document.getElementById('sumTime'), sumM=document.getElementById('sumMoney');
-const loadDays=()=>JSON.parse(localStorage.getItem(DS)||'[]');
-const saveDays=d=>localStorage.setItem(DS,JSON.stringify(d));
-const loadRate=()=>JSON.parse(localStorage.getItem(SS)||'{"hourly":null}').hourly;
-const saveRate=v=>localStorage.setItem(SS,JSON.stringify({hourly:v}));
-const m2h=m=>m/60;
-const fmtMin=m=>`${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}`;
-const parse=t=>{if(!t)return null;const [h,m]=t.replace('.',':').split(':').map(Number);if(isNaN(h)||isNaN(m))return null;return h*60+m};
-function render(){const days=loadDays();const rate=loadRate();let total=0;daysEl.innerHTML='';const g={};days.forEach(d=>{const k=d.iso.slice(0,7);(g[k]=g[k]||[]).push(d)});
-Object.keys(g).sort().reverse().forEach(k=>{const list=g[k];let msum=0;const box=document.createElement('div');box.className='month';const h=document.createElement('div');h.className='month-head';h.innerHTML=`<div class="month-title"><div class="name">${new Date(k+'-01').toLocaleDateString('de-DE',{month:'long',year:'numeric'})}</div><div class="sub">${list.length} Tage</div></div>`;const chip=document.createElement('div');chip.className='chip';h.appendChild(chip);box.appendChild(h);
-list.forEach(d=>{let dur=d.end-d.start;if(dur<0)dur+=1440;const net=dur-d.pause;msum+=net;total+=net;const row=document.createElement('div');row.className='day';row.innerHTML=`<div><strong>${d.title}</strong><div class="meta">${fmtMin(d.start)}–${fmtMin(d.end)} · Pause ${fmtMin(d.pause)}</div></div><div><div class="badge">${fmtMin(net)}</div><div class="badge">${rate?fmtE.format(m2h(net)*rate):'€ —'}</div></div>`;box.appendChild(row)});
-chip.textContent=`${fmtMin(msum)}`;daysEl.appendChild(box)});
-sumT.textContent=fmtMin(total);sumM.textContent=rate?fmtE.format(m2h(total)*rate):'0,00 €'}
+      <div class="actions">
+        <button class="btn primary" id="btnAddTop" type="button">
+          <span class="icon" aria-hidden="true">＋</span>
+          Neuer Arbeitstag
+        </button>
+        <button class="btn secondary" id="btnReset" type="button" title="Alle Einträge löschen">
+          <span class="icon" aria-hidden="true">↺</span>
+          Zurücksetzen
+        </button>
+      </div>
+    </section>
 
-btnAdd.onclick=()=>dlgDay.showModal();
-saveDay.onclick=()=>{const s=parse(start.value),e=parse(end.value),p=parse(pause.value)||0;if(s==null||e==null)return;const d=loadDays();d.push({iso:new Date().toISOString(),title:new Date().toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'}),start:s,end:e,pause:p});saveDays(d);dlgDay.close();render()}
-btnSettings.onclick=()=>dlgSettings.showModal();
-saveSettings.onclick=()=>{const v=Number(hourly.value.replace(',','.'));if(!isNaN(v))saveRate(v);dlgSettings.close();render()}
-render();
-</script>
+    <section class="section" aria-label="Übersicht der Arbeitstage">
+      <div class="section-head">
+        <h3>Übersicht</h3>
+        <div class="hint">(Ende − Start) − Pause = Nettozeit · Nettozeit × Stundenlohn = €</div>
+      </div>
+
+      <div class="days" id="days"></div>
+    </section>
+  </main>
+
+  <button class="fab" id="fab" aria-label="Neuen Arbeitstag hinzufügen" title="Neuer Arbeitstag">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M12 5V19" stroke="rgba(255,255,255,0.92)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M5 12H19" stroke="rgba(255,255,255,0.92)" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <!-- Workday dialog -->
+  <dialog id="dlg">
+    <form method="dialog" id="form">
+      <div class="dlg-head">
+        <div>
+          <h4 id="dlgTitle">Neuer Arbeitstag</h4>
+          <p id="dlgSubtitle">Start/Ende & Pause (Format hh:mm). Über Mitternacht ist erlaubt.</p>
+        </div>
+        <button class="xbtn" value="cancel" aria-label="Schließen" type="submit">✕</button>
+      </div>
+
+      <div class="dlg-body">
+        <div class="grid">
+          <div class="row">
+            <div class="field">
+              <label for="start">Start – Format <strong>hh:mm</strong></label>
+              <input id="start" name="start" inputmode="numeric" autocomplete="off" placeholder="z.B. 08:00" />
+            </div>
+            <div class="field">
+              <label for="end">Ende – Format <strong>hh:mm</strong></label>
+              <input id="end" name="end" inputmode="numeric" autocomplete="off" placeholder="z.B. 16:30" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="break">Pause – Format <strong>hh:mm</strong> (optional)</label>
+            <input id="break" name="break" inputmode="numeric" autocomplete="off" placeholder="z.B. 00:30" />
+          </div>
+
+          <div class="error" id="error" role="alert"></div>
+        </div>
+      </div>
+
+      <div class="dlg-foot">
+        <button class="btn secondary" value="cancel" type="submit">Abbrechen</button>
+        <button class="btn primary" id="btnSave" value="default" type="button">
+          <span class="icon" aria-hidden="true">✓</span>
+          Speichern
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Settings dialog -->
+  <dialog id="dlgSettings">
+    <form method="dialog" id="formSettings">
+      <div class="dlg-head">
+        <div>
+          <h4>Einstellungen</h4>
+          <p>Stundenlohn wird lokal gespeichert (nur auf diesem Gerät).</p>
+        </div>
+        <button class="xbtn" value="cancel" aria-label="Schließen" type="submit">✕</button>
+      </div>
+
+      <div class="dlg-body">
+        <div class="grid">
+          <div class="field">
+            <label for="hourly">Stundenlohn (EUR)</label>
+            <input id="hourly" name="hourly" inputmode="decimal" autocomplete="off" placeholder="z.B. 18,50" />
+          </div>
+          <div class="note" id="hourlyNote">Aktuell: —</div>
+          <div class="error" id="errorSettings" role="alert"></div>
+        </div>
+      </div>
+
+      <div class="dlg-foot">
+        <button class="btn secondary" value="cancel" type="submit">Schließen</button>
+        <button class="btn primary" id="btnSaveSettings" value="default" type="button">
+          <span class="icon" aria-hidden="true">✓</span>
+          Speichern
+        </button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const STORAGE_DAYS = 'arbeitszeittracker.days.v2';
+    const STORAGE_SETTINGS = 'arbeitszeittracker.settings.v1';
+
+    const elDays = document.getElementById('days');
+    const elSum = document.getElementById('sumTotal');
+    const elSumMoney = document.getElementById('sumMoney');
+    const elSubtitle = document.getElementById('subtitle');
+
+    // Workday dialog
+    const dlg = document.getElementById('dlg');
+    const elStart = document.getElementById('start');
+    const elEnd = document.getElementById('end');
+    const elBreak = document.getElementById('break');
+    const elError = document.getElementById('error');
+
+    const btnAddTop = document.getElementById('btnAddTop');
+    const btnFab = document.getElementById('fab');
+    const btnSave = document.getElementById('btnSave');
+    const btnReset = document.getElementById('btnReset');
+
+    // Settings
+    const btnSettings = document.getElementById('btnSettings');
+    const dlgSettings = document.getElementById('dlgSettings');
+    const elHourly = document.getElementById('hourly');
+    const elHourlyNote = document.getElementById('hourlyNote');
+    const elErrorSettings = document.getElementById('errorSettings');
+    const btnSaveSettings = document.getElementById('btnSaveSettings');
+
+    const fmtEUR = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+    const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
+
+    function pad2(n){ return String(n).padStart(2,'0'); }
+
+    function formatMinutes(min){
+      const h = Math.floor(min / 60);
+      const m = Math.abs(min % 60);
+      return `${h}:${pad2(m)}`;
+    }
+
+    function formatClock(min){
+      const m = ((min % 1440) + 1440) % 1440;
+      const hh = Math.floor(m / 60);
+      const mm = m % 60;
+      return `${pad2(hh)}:${pad2(mm)}`;
+    }
+
+    function todayTitle(){
+      const now = new Date();
+      const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(now);
+      const date = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
+      return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} · ${date}`;
+    }
+
+    function todayISO(){
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = pad2(d.getMonth()+1);
+      const day = pad2(d.getDate());
+      return `${y}-${m}-${day}`;
+    }
+
+    function showError(el, msg){ el.textContent = msg; el.style.display = 'block'; }
+    function clearError(el){ el.textContent = ''; el.style.display = 'none'; }
+
+    function parseHHMM(str, { allowEmpty=false } = {}){
+      const s = String(str ?? '').trim();
+      if(!s){ return allowEmpty ? 0 : null; }
+      const normalized = s.replace('.', ':');
+      const m = normalized.match(/^\s*(\d{1,2})\s*:\s*(\d{1,2})\s*$/);
+      if(!m) return null;
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+      if(hh < 0 || hh > 23) return null;
+      if(mm < 0 || mm > 59) return null;
+      return (hh * 60) + mm;
+    }
+
+    function parseMoney(str){
+      const raw = String(str ?? '').trim();
+      if(!raw) return null;
+      const normalized = raw.replace(/\s/g,'').replace(',', '.');
+      const v = Number(normalized);
+      if(!Number.isFinite(v) || v < 0) return null;
+      return v;
+    }
+
+    function uid(){ return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+
+    function loadDays(){
+      try{
+        const raw = localStorage.getItem(STORAGE_DAYS);
+        if(!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      }catch{ return []; }
+    }
+
+    function saveDays(days){ localStorage.setItem(STORAGE_DAYS, JSON.stringify(days)); }
+
+    function loadSettings(){
+      try{
+        const raw = localStorage.getItem(STORAGE_SETTINGS);
+        if(!raw) return { hourlyRate: null };
+        const parsed = JSON.parse(raw);
+        return { hourlyRate: (typeof parsed?.hourlyRate === 'number' ? parsed.hourlyRate : null) };
+      }catch{ return { hourlyRate: null }; }
+    }
+
+    function saveSettings(s){ localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(s)); }
+
+    function durationMin(day){
+      const s = day.startMin ?? 0;
+      const e = day.endMin ?? 0;
+      let diff = e - s;
+      if(diff < 0) diff += 1440; // overnight
+      return diff;
+    }
+
+    function netMin(day){
+      const dur = durationMin(day);
+      return Math.max(0, dur - (day.breakMin || 0));
+    }
+
+    function moneyForMinutes(minutes, hourlyRate){
+      if(!(typeof hourlyRate === 'number') || !Number.isFinite(hourlyRate)) return 0;
+      return (minutes / 60) * hourlyRate;
+    }
+
+    function updateSubtitle(){
+      const { hourlyRate } = loadSettings();
+      if(typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)){
+        elSubtitle.textContent = `Stundenlohn: ${fmtEUR.format(hourlyRate)} · lokal gespeichert`;
+      }else{
+        elSubtitle.textContent = 'Minimal. Präzise. Unter Kontrolle.';
+      }
+    }
+
+    function render(){
+      const days = loadDays();
+      const { hourlyRate } = loadSettings();
+
+      // newest first
+      days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
+
+      const totalNetMin = days.reduce((acc, d) => acc + netMin(d), 0);
+      const totalMoney = moneyForMinutes(totalNetMin, hourlyRate);
+
+      elSum.textContent = formatMinutes(totalNetMin);
+      elSumMoney.textContent = fmtEUR.format(totalMoney);
+
+      elDays.innerHTML = '';
+      if(days.length === 0){
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.innerHTML = `Noch keine Einträge.<br/>Tippe auf <strong>＋</strong>, um deinen ersten Arbeitstag zu speichern.`;
+        elDays.appendChild(empty);
+        return;
+      }
+
+      // group by month YYYY-MM
+      const groups = new Map();
+      for(const d of days){
+        const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
+        if(!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(d);
+      }
+      const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
+
+      for(const key of keys){
+        const list = groups.get(key) || [];
+
+        let monthName = 'Unbekannter Monat';
+        if(key !== '0000-00'){
+          const dt = new Date(`${key}-01T00:00:00`);
+          monthName = fmtMonth.format(dt);
+          monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+        }
+
+        const monthNetMin = list.reduce((acc, d) => acc + netMin(d), 0);
+        const monthMoney = moneyForMinutes(monthNetMin, hourlyRate);
+
+        const month = document.createElement('div');
+        month.className = 'month';
+
+        const head = document.createElement('div');
+        head.className = 'month-head';
+
+        const title = document.createElement('div');
+        title.className = 'month-title';
+        title.innerHTML = `<div class="name">${monthName}</div><div class="sub">${list.length} Eintrag${list.length===1?'':'e'}</div>`;
+
+        const sums = document.createElement('div');
+        sums.className = 'month-sums';
+
+        const chipNet = document.createElement('div');
+        chipNet.className = 'chip ok';
+        chipNet.textContent = `Netto ${formatMinutes(monthNetMin)}`;
+        sums.appendChild(chipNet);
+
+        const chipMoney = document.createElement('div');
+        chipMoney.className = 'chip money';
+        chipMoney.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
+          ? fmtEUR.format(monthMoney)
+          : '€ —';
+        sums.appendChild(chipMoney);
+
+        head.appendChild(title);
+        head.appendChild(sums);
+
+        const monthDays = document.createElement('div');
+        monthDays.className = 'month-days';
+
+        for(const d of list){
+          const dur = durationMin(d);
+          const net = netMin(d);
+          const money = moneyForMinutes(net, hourlyRate);
+
+          const item = document.createElement('div');
+          item.className = 'day';
+
+          const left = document.createElement('div');
+          left.className = 'day-title';
+
+          const t = document.createElement('div');
+          t.className = 'date';
+          t.textContent = d.title || 'Arbeitstag';
+
+          const meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.textContent = `${formatClock(d.startMin ?? 0)}–${formatClock(d.endMin ?? 0)} · Dauer ${formatMinutes(dur)} · Pause ${formatMinutes(d.breakMin || 0)}`;
+
+          left.appendChild(t);
+          left.appendChild(meta);
+
+          const right = document.createElement('div');
+          right.className = 'rightcol';
+
+          const badgeNet = document.createElement('div');
+          badgeNet.className = 'badge ok';
+          badgeNet.textContent = `Netto ${formatMinutes(net)}`;
+
+          const badgeMoney = document.createElement('div');
+          badgeMoney.className = 'badge money';
+          badgeMoney.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
+            ? fmtEUR.format(money)
+            : '€ — (Stundenlohn)';
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'btn secondary';
+          del.style.padding = '10px 12px';
+          del.style.borderRadius = '14px';
+          del.style.fontSize = '12px';
+          del.style.boxShadow = 'none';
+          del.style.background = 'rgba(255,255,255,0.05)';
+          del.innerHTML = `<span class="icon" aria-hidden="true">🗑</span> Löschen`;
+          del.addEventListener('click', () => {
+            const ok = confirm('Diesen Eintrag wirklich löschen?');
+            if(!ok) return;
+            const cur = loadDays().filter(x => x.id !== d.id);
+            saveDays(cur);
+            render();
+          });
+
+          right.appendChild(badgeNet);
+          right.appendChild(badgeMoney);
+          right.appendChild(del);
+
+          item.appendChild(left);
+          item.appendChild(right);
+
+          monthDays.appendChild(item);
+        }
+
+        month.appendChild(head);
+        month.appendChild(monthDays);
+        elDays.appendChild(month);
+      }
+    }
+
+    function openDialog(d){
+      if(typeof d.showModal === 'function') d.showModal();
+      else d.setAttribute('open','');
+    }
+    function closeDialog(d){
+      if(typeof d.close === 'function') d.close();
+      else d.removeAttribute('open');
+    }
+
+    function openDialogWorkday(){
+      clearError(elError);
+      elStart.value='';
+      elEnd.value='';
+      elBreak.value='';
+      document.getElementById('dlgTitle').textContent = todayTitle();
+      document.getElementById('dlgSubtitle').textContent = 'Start/Ende & Pause eintragen (Format hh:mm). Über Mitternacht ist erlaubt.';
+      openDialog(dlg);
+      setTimeout(()=>elStart.focus(), 60);
+    }
+
+    function saveWorkday(){
+      clearError(elError);
+
+      const startMin = parseHHMM(elStart.value, { allowEmpty:false });
+      const endMin = parseHHMM(elEnd.value, { allowEmpty:false });
+      const breakMin = parseHHMM(elBreak.value, { allowEmpty:true });
+
+      if(startMin === null) return showError(elError, 'Bitte gib eine gültige Startzeit im Format hh:mm ein (z.B. 08:00).');
+      if(endMin === null) return showError(elError, 'Bitte gib eine gültige Endzeit im Format hh:mm ein (z.B. 16:30).');
+      if(breakMin === null) return showError(elError, 'Bitte gib eine gültige Pausenzeit im Format hh:mm ein (z.B. 00:30).');
+
+      let dur = endMin - startMin;
+      if(dur < 0) dur += 1440;
+      if(dur === 0) return showError(elError, 'Start und Ende ergeben 0 Minuten. Beispiel Nachtschicht: 22:00–06:00.');
+      if(breakMin > dur) return showError(elError, 'Die Pausenzeit kann nicht größer sein als die (berechnete) Arbeitsdauer.');
+
+      const day = {
+        id: uid(),
+        isoDate: todayISO(),
+        title: todayTitle(),
+        startMin,
+        endMin,
+        breakMin,
+      };
+
+      const days = loadDays();
+      days.push(day);
+      saveDays(days);
+      closeDialog(dlg);
+      render();
+    }
+
+    function resetAll(){
+      const ok = confirm('Wirklich alle Einträge löschen?');
+      if(!ok) return;
+      localStorage.removeItem(STORAGE_DAYS);
+      render();
+    }
+
+    function openSettings(){
+      clearError(elErrorSettings);
+      const { hourlyRate } = loadSettings();
+      elHourly.value = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? String(hourlyRate).replace('.', ',') : '';
+      elHourlyNote.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
+        ? `Aktuell: ${fmtEUR.format(hourlyRate)} pro Stunde`
+        : 'Aktuell: — (nicht gesetzt)';
+      openDialog(dlgSettings);
+      setTimeout(()=>elHourly.focus(), 60);
+    }
+
+    function saveSettingsFromDialog(){
+      clearError(elErrorSettings);
+      const v = elHourly.value.trim();
+      if(!v){
+        saveSettings({ hourlyRate: null });
+        closeDialog(dlgSettings);
+        updateSubtitle();
+        render();
+        return;
+      }
+      const hourlyRate = parseMoney(v);
+      if(hourlyRate === null) return showError(elErrorSettings, 'Bitte gib einen gültigen Stundenlohn ein (z.B. 18,50).');
+      if(hourlyRate > 1000) return showError(elErrorSettings, 'Das wirkt sehr hoch – falls korrekt, trage es ohne Sonderzeichen ein (z.B. 1200).');
+
+      saveSettings({ hourlyRate });
+      closeDialog(dlgSettings);
+      updateSubtitle();
+      render();
+    }
+
+    function smartTimeInput(el){
+      el.addEventListener('input', () => {
+        const digits = el.value.replace(/[^0-9]/g, '');
+        if(digits.length <= 2){ el.value = digits; return; }
+        const hh = digits.slice(0,2);
+        const mm = digits.slice(2,4);
+        el.value = mm.length ? `${hh}:${mm}` : `${hh}:`;
+      });
+    }
+
+    smartTimeInput(elStart);
+    smartTimeInput(elEnd);
+    smartTimeInput(elBreak);
+
+    btnAddTop.addEventListener('click', openDialogWorkday);
+    btnFab.addEventListener('click', openDialogWorkday);
+    btnSave.addEventListener('click', saveWorkday);
+    btnReset.addEventListener('click', resetAll);
+
+    btnSettings.addEventListener('click', openSettings);
+    btnSaveSettings.addEventListener('click', saveSettingsFromDialog);
+
+    document.getElementById('form').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); saveWorkday(); }
+    });
+
+    document.getElementById('formSettings').addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){ e.preventDefault(); saveSettingsFromDialog(); }
+    });
+
+    dlg.addEventListener('close', () => clearError(elError));
+    dlgSettings.addEventListener('close', () => clearError(elErrorSettings));
+
+    updateSubtitle();
+    render();
+  </script>
 </body>
 </html>
