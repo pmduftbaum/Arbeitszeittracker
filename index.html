@@ -2,13 +2,12 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0b0c" />
   <title>Arbeitszeittracker</title>
 
-  <!-- Favicon / Icon (SVG data URI). Works as browser icon; iOS home-screen icon is best with real PNGs (see comment below). -->
+  <!-- Favicon (SVG data URI) -->
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='128' height='128' viewBox='0 0 128 128'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='28%25' cy='28%25' r='70%25'%3E%3Cstop offset='0' stop-color='%238bb7ff' stop-opacity='.95'/%3E%3Cstop offset='.7' stop-color='%238bb7ff' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g2' cx='75%25' cy='75%25' r='70%25'%3E%3Cstop offset='0' stop-color='%236ee7b7' stop-opacity='.75'/%3E%3Cstop offset='.7' stop-color='%236ee7b7' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect x='10' y='10' width='108' height='108' rx='28' fill='%230b0b0c'/%3E%3Crect x='10' y='10' width='108' height='108' rx='28' fill='url(%23g1)'/%3E%3Crect x='10' y='10' width='108' height='108' rx='28' fill='url(%23g2)'/%3E%3Cpath d='M40 68h18l6-28 8 56 6-28h20' fill='none' stroke='white' stroke-opacity='.92' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
-  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180' viewBox='0 0 180 180'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='28%25' cy='28%25' r='70%25'%3E%3Cstop offset='0' stop-color='%238bb7ff' stop-opacity='.95'/%3E%3Cstop offset='.7' stop-color='%238bb7ff' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g2' cx='75%25' cy='75%25' r='70%25'%3E%3Cstop offset='0' stop-color='%236ee7b7' stop-opacity='.75'/%3E%3Cstop offset='.7' stop-color='%236ee7b7' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect x='14' y='14' width='152' height='152' rx='36' fill='%230b0b0c'/%3E%3Crect x='14' y='14' width='152' height='152' rx='36' fill='url(%23g1)'/%3E%3Crect x='14' y='14' width='152' height='152' rx='36' fill='url(%23g2)'/%3E%3Cpath d='M58 96h26l9-42 12 84 9-42h28' fill='none' stroke='white' stroke-opacity='.92' stroke-width='10' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 
   <!-- XLSX (SheetJS) for export + import -->
   <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -28,23 +27,49 @@
 
     *{ box-sizing:border-box; }
     html,body{ height:100%; }
+    html{ -webkit-text-size-adjust:100%; background: var(--bg); }
 
-    /* Seam-Fix: auch beim Overscroll immer gleiche Basisfarbe */
-    html{ background: var(--bg); }
-
-    body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      color:var(--text);
-      background-color: var(--bg);
+    /*
+      ✅ Hintergrund „unendlich“ + Seam-Fix:
+      - Wir rendern den Gradient auf einem ABSOLUTEN Layer, der so hoch wie der Content ist.
+      - Zusätzlich wird ein FIXED Layer genutzt (iOS/WebKit Compositor liebt das), beide sind identisch.
+      - Dadurch gibt es keine harte Kante mehr, selbst bei langen Listen.
+    */
+    .bg-absolute{
+      position:absolute;
+      inset:0;
+      z-index:-2;
       background:
         radial-gradient(1200px 900px at 15% 10%, rgba(139,183,255,0.22), transparent 55%),
         radial-gradient(900px 700px at 80% 15%, rgba(110,231,183,0.12), transparent 55%),
         radial-gradient(1200px 900px at 55% 110%, rgba(251,113,133,0.10), transparent 50%),
         var(--bg);
-      background-repeat: no-repeat;
-      background-attachment: fixed;
+      /* wichtig: kein no-repeat, damit es nie „abbricht“ */
+      background-repeat: repeat;
+      background-size: auto;
+    }
+    .bg-fixed{
+      position:fixed;
+      inset:0;
+      z-index:-3;
+      pointer-events:none;
+      background:
+        radial-gradient(1200px 900px at 15% 10%, rgba(139,183,255,0.22), transparent 55%),
+        radial-gradient(900px 700px at 80% 15%, rgba(110,231,183,0.12), transparent 55%),
+        radial-gradient(1200px 900px at 55% 110%, rgba(251,113,133,0.10), transparent 50%),
+        var(--bg);
+      background-repeat: repeat;
+      transform: translateZ(0);
+    }
+
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background: transparent;
       overflow-x:hidden;
+      position:relative;
+      min-height:100vh;
     }
 
     .wrap{ max-width:var(--container); margin:0 auto; padding:36px 18px 64px; }
@@ -315,25 +340,27 @@
     .fab:hover{ transform:translateY(-2px); filter:brightness(1.05); }
     .fab:active{ transform:translateY(0) scale(0.98); }
 
-    /* Dialog */
+    /* Dialog (scroll-fähig, Footer bleibt sichtbar) */
     dialog{
       width:min(560px, calc(100% - 36px));
+      max-height:min(84vh, 760px);
       border:1px solid rgba(255,255,255,0.14);
       border-radius:24px;
       padding:0;
-      overflow: hidden;
+      overflow:hidden;
       background: rgba(20,20,22,0.86);
       color:var(--text);
       box-shadow: 0 30px 90px rgba(0,0,0,0.70);
       backdrop-filter: blur(22px);
       -webkit-backdrop-filter: blur(22px);
-      overflow:hidden;
       transform: translateY(8px);
       opacity: 0;
       animation: pop .18s ease forwards;
     }
     @keyframes pop{ to{ transform: translateY(0); opacity: 1; } }
     dialog::backdrop{ background: rgba(0,0,0,0.55); }
+
+    form.dlg-form{ display:flex; flex-direction:column; max-height:inherit; }
 
     .dlg-head{
       padding:18px 18px 14px;
@@ -359,11 +386,18 @@
       cursor:pointer;
       transition: transform .18s ease, background .18s ease;
       -webkit-tap-highlight-color: transparent;
+      flex:0 0 auto;
     }
     .xbtn:hover{ background: rgba(255,255,255,0.10); transform: translateY(-1px); }
     .xbtn:active{ transform: translateY(0) scale(0.98); }
 
-    .dlg-body{ padding:16px 18px 10px; }
+    .dlg-body{
+      padding:16px 18px 10px;
+      overflow:auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+    }
+
     .grid{ display:grid; gap:12px; grid-template-columns:1fr; }
     .row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
@@ -377,17 +411,12 @@
       border:1px solid rgba(255,255,255,0.14);
       background: rgba(255,255,255,0.06);
       color:var(--text);
-      font-size:14px;
+      font-size:16px; /* iOS input zoom fix */
       outline:none;
       transition: border-color .18s ease, background .18s ease;
       font-variant-numeric: tabular-nums;
     }
     input:focus{ border-color: rgba(139,183,255,0.34); background: rgba(255,255,255,0.08); }
-
-    /* iOS-Zoom Fix: iPhone Safari zoomt bei input < 16px */
-    @supports (-webkit-touch-callout: none) {
-      input{ font-size:16px; }
-    }
 
     .note{
       font-size:12px;
@@ -411,12 +440,7 @@
       line-height:1.45;
     }
 
-    .split{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:12px;
-    }
-
+    .split{ display:grid; grid-template-columns: 1fr; gap:12px; }
     .fileRow{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .fileRow input[type=file]{
       border:1px solid rgba(255,255,255,0.14);
@@ -443,6 +467,10 @@
   </style>
 </head>
 <body>
+  <!-- Background layers -->
+  <div class="bg-fixed" aria-hidden="true"></div>
+  <div class="bg-absolute" aria-hidden="true"></div>
+
   <header class="topbar">
     <div class="topbar-inner">
       <div class="left">
@@ -514,7 +542,7 @@
 
   <!-- Workday dialog -->
   <dialog id="dlg">
-    <form method="dialog" id="form">
+    <form method="dialog" id="form" class="dlg-form">
       <div class="dlg-head">
         <div>
           <h4 id="dlgTitle">Neuer Arbeitstag</h4>
@@ -557,7 +585,7 @@
 
   <!-- Settings dialog -->
   <dialog id="dlgSettings">
-    <form method="dialog" id="formSettings">
+    <form method="dialog" id="formSettings" class="dlg-form">
       <div class="dlg-head">
         <div>
           <h4>Einstellungen</h4>
@@ -727,7 +755,6 @@
     }
 
     function parseDateDE(value){
-      // accepts: DD.MM.YYYY or DD-MM-YYYY or YYYY-MM-DD
       const s = String(value ?? '').trim();
       if(!s) return null;
       let m = s.match(/^\s*(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\s*$/);
@@ -739,9 +766,7 @@
       if(m){
         return `${m[1]}-${m[2]}-${m[3]}`;
       }
-      // Excel date (number)
       if(typeof value === 'number' && Number.isFinite(value)){
-        // Excel serial date to JS date (SheetJS uses 1900 system by default)
         const dt = new Date(Math.round((value - 25569) * 86400 * 1000));
         const yyyy = dt.getUTCFullYear();
         const mm = pad2(dt.getUTCMonth()+1);
@@ -779,7 +804,7 @@
       const s = day.startMin ?? 0;
       const e = day.endMin ?? 0;
       let diff = e - s;
-      if(diff < 0) diff += 1440; // overnight
+      if(diff < 0) diff += 1440;
       return diff;
     }
 
@@ -806,7 +831,6 @@
       const days = loadDays();
       const { hourlyRate } = loadSettings();
 
-      // newest first
       days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
 
       const totalNetMin = days.reduce((acc, d) => acc + netMin(d), 0);
@@ -824,7 +848,6 @@
         return;
       }
 
-      // group by month YYYY-MM
       const groups = new Map();
       for(const d of days){
         const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
@@ -1164,7 +1187,6 @@
     }
 
     function normalizeImportedDays(imported){
-      // de-duplicate: same isoDate + start + end + break
       const seen = new Set();
       const out = [];
       for(const d of imported){
@@ -1174,16 +1196,6 @@
         out.push(d);
       }
       return out;
-    }
-
-    function readSheetAsAOA(wb, preferredName){
-      const XLSX = window.XLSX;
-      if(!XLSX) return null;
-      const name = wb.SheetNames.find(n => n.toLowerCase() === String(preferredName).toLowerCase()) || wb.SheetNames[0];
-      const ws = wb.Sheets[name];
-      if(!ws) return null;
-      // raw=true keeps numbers; defval="" keeps empty strings
-      return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
     }
 
     function findHeaderRow(aoa){
@@ -1198,7 +1210,6 @@
       const XLSX = window.XLSX;
       if(!XLSX) return null;
 
-      // Prefer sheet "Monate" if exists
       const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'monate');
       if(sheetName){
         const ws = wb.Sheets[sheetName];
@@ -1218,7 +1229,6 @@
         }
       }
 
-      // Fallback: scan "Arbeitstage" for first valid hourly
       const sheetName2 = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage');
       if(sheetName2){
         const ws = wb.Sheets[sheetName2];
@@ -1245,7 +1255,6 @@
       const XLSX = window.XLSX;
       if(!XLSX) throw new Error('Import-Library nicht geladen');
 
-      // Read Arbeitstage
       const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage') || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
@@ -1256,9 +1265,7 @@
 
       const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
       const col = {
-        month: header.indexOf('monat'),
         date: header.indexOf('datum'),
-        weekday: header.indexOf('wochentag'),
         start: header.indexOf('start'),
         end: header.indexOf('ende'),
         pause: header.indexOf('pause'),
@@ -1271,7 +1278,6 @@
       const imported = [];
       for(let r=h+1;r<aoa.length;r++){
         const row = aoa[r] || [];
-        // skip separators / month title rows
         const rawDate = row[col.date];
         const iso = parseDateDE(rawDate);
         if(!iso) continue;
@@ -1286,23 +1292,21 @@
 
         if(startMin === null || endMin === null || breakMin === null) continue;
 
-        const d = {
+        imported.push({
           id: uid(),
           isoDate: iso,
           title: weekdayTitleFromISO(iso),
           startMin,
           endMin,
           breakMin,
-        };
-        imported.push(d);
+        });
       }
 
       if(imported.length === 0) throw new Error('Keine gültigen Arbeitstage gefunden.');
-
       return normalizeImportedDays(imported);
     }
 
-    async function doImport(mode /* 'replace' | 'merge' */){
+    async function doImport(mode){
       clearError(elErrorSettings);
 
       const XLSX = window.XLSX;
@@ -1321,7 +1325,6 @@
 
         const importedDays = importFromWorkbook(wb);
 
-        // hourly rate handling
         const importedRate = extractHourlyRateFromWorkbook(wb);
         if(importedRate !== null){
           const cur = loadSettings().hourlyRate;
@@ -1339,7 +1342,6 @@
           if(!ok) return;
           saveDays(importedDays);
         } else {
-          // merge
           const existing = loadDays();
           const merged = normalizeImportedDays(existing.concat(importedDays));
           saveDays(merged);
@@ -1348,7 +1350,6 @@
         render();
         importFile.value = '';
         showError(elErrorSettings, `✅ Import erfolgreich (${importedDays.length} Einträge).`);
-        // turn green-ish by tweaking border with inline style (small UX)
         elErrorSettings.style.borderColor = 'rgba(110,231,183,0.28)';
         elErrorSettings.style.background = 'rgba(110,231,183,0.10)';
 
@@ -1383,7 +1384,6 @@
 
     dlg.addEventListener('close', () => clearError(elError));
     dlgSettings.addEventListener('close', () => {
-      // reset success styling
       elErrorSettings.style.borderColor = 'rgba(251,113,133,0.28)';
       elErrorSettings.style.background = 'rgba(251,113,133,0.10)';
       clearError(elErrorSettings);
@@ -1391,10 +1391,6 @@
 
     updateSubtitle();
     render();
-
-    // NOTE: For a *perfect* iPhone Home-Screen icon, add real PNG files and set:
-    // <link rel="apple-touch-icon" href="/icons/icon-180.png">
-    // plus a manifest.json with 192/512 icons.
   </script>
 </body>
 </html>
