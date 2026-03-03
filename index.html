@@ -654,357 +654,458 @@
   </dialog>
 
   <script>
-    const STORAGE_DAYS = 'arbeitszeittracker.days.v2';
-    const STORAGE_SETTINGS = 'arbeitszeittracker.settings.v1';
+  const STORAGE_DAYS = 'arbeitszeittracker.days.v2';
+  const STORAGE_SETTINGS = 'arbeitszeittracker.settings.v1';
 
-    const elDays = document.getElementById('days');
-    const elSum = document.getElementById('sumTotal');
-    const elSumMoney = document.getElementById('sumMoney');
-    const elSubtitle = document.getElementById('subtitle');
+  const elDays = document.getElementById('days');
+  const elSum = document.getElementById('sumTotal');
+  const elSumMoney = document.getElementById('sumMoney');
+  const elSubtitle = document.getElementById('subtitle');
 
-    // Workday dialog
-    const dlg = document.getElementById('dlg');
-    const elStart = document.getElementById('start');
-    const elEnd = document.getElementById('end');
-    const elBreak = document.getElementById('break');
-    const elError = document.getElementById('error');
+  // Workday dialog
+  const dlg = document.getElementById('dlg');
+  const elStart = document.getElementById('start');
+  const elEnd = document.getElementById('end');
+  const elBreak = document.getElementById('break');
+  const elError = document.getElementById('error');
 
-    const btnAddTop = document.getElementById('btnAddTop');
-    const btnFab = document.getElementById('fab');
-    const btnSave = document.getElementById('btnSave');
-    const btnReset = document.getElementById('btnReset');
+  const btnAddTop = document.getElementById('btnAddTop');
+  const btnFab = document.getElementById('fab');
+  const btnSave = document.getElementById('btnSave');
+  const btnReset = document.getElementById('btnReset');
 
-    // Settings
-    const btnSettings = document.getElementById('btnSettings');
-    const dlgSettings = document.getElementById('dlgSettings');
-    const elHourly = document.getElementById('hourly');
-    const elHourlyNote = document.getElementById('hourlyNote');
-    const elErrorSettings = document.getElementById('errorSettings');
-    const btnSaveSettings = document.getElementById('btnSaveSettings');
-    const btnExport = document.getElementById('btnExport');
+  // Settings
+  const btnSettings = document.getElementById('btnSettings');
+  const dlgSettings = document.getElementById('dlgSettings');
+  const elHourly = document.getElementById('hourly');
+  const elHourlyNote = document.getElementById('hourlyNote');
+  const elErrorSettings = document.getElementById('errorSettings');
+  const btnSaveSettings = document.getElementById('btnSaveSettings');
+  const btnExport = document.getElementById('btnExport');
 
-    // Import
-    const importFile = document.getElementById('importFile');
-    const btnImportReplace = document.getElementById('btnImportReplace');
-    const btnImportMerge = document.getElementById('btnImportMerge');
+  // Import
+  const importFile = document.getElementById('importFile');
+  const btnImportReplace = document.getElementById('btnImportReplace');
+  const btnImportMerge = document.getElementById('btnImportMerge');
 
-    const fmtEUR = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
-    const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
+  const fmtEUR = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+  const fmtMonth = new Intl.DateTimeFormat('de-DE', { month: 'long', year: 'numeric' });
 
-    function pad2(n){ return String(n).padStart(2,'0'); }
+  function pad2(n){ return String(n).padStart(2,'0'); }
 
-    function formatMinutes(min){
-      const h = Math.floor(min / 60);
-      const m = Math.abs(min % 60);
-      return `${h}:${pad2(m)}`;
+  function formatMinutes(min){
+    const h = Math.floor(min / 60);
+    const m = Math.abs(min % 60);
+    return `${h}:${pad2(m)}`;
+  }
+
+  function formatClock(min){
+    const m = ((min % 1440) + 1440) % 1440;
+    const hh = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${pad2(hh)}:${pad2(mm)}`;
+  }
+
+  function weekdayTitleFromISO(iso){
+    const dt = new Date(iso + 'T00:00:00');
+    const weekday = new Intl.DateTimeFormat('de-DE', { weekday:'long' }).format(dt);
+    const date = new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).format(dt);
+    return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} · ${date}`;
+  }
+
+  function todayTitle(){
+    const now = new Date();
+    const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(now);
+    const date = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
+    return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} · ${date}`;
+  }
+
+  function todayISO(){
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = pad2(d.getMonth()+1);
+    const day = pad2(d.getDate());
+    return `${y}-${m}-${day}`;
+  }
+
+  function showError(el, msg){ el.textContent = msg; el.style.display = 'block'; }
+  function clearError(el){ el.textContent = ''; el.style.display = 'none'; }
+
+  function parseHHMM(str, { allowEmpty=false } = {}){
+    const s = String(str ?? '').trim();
+    if(!s){ return allowEmpty ? 0 : null; }
+    const normalized = s.replace('.', ':');
+    const m = normalized.match(/^\s*(\d{1,2})\s*:\s*(\d{1,2})\s*$/);
+    if(!m) return null;
+    const hh = Number(m[1]);
+    const mm = Number(m[2]);
+    if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+    if(hh < 0 || hh > 23) return null;
+    if(mm < 0 || mm > 59) return null;
+    return (hh * 60) + mm;
+  }
+
+  function parseMoney(str){
+    const raw = String(str ?? '').trim();
+    if(!raw) return null;
+    const normalized = raw.replace(/\s/g,'').replace(',', '.');
+    const v = Number(normalized);
+    if(!Number.isFinite(v) || v < 0) return null;
+    return v;
+  }
+
+  function parseDateDE(value){
+    const s = String(value ?? '').trim();
+    if(!s) return null;
+    let m = s.match(/^\s*(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\s*$/);
+    if(m){
+      const dd = m[1], mm = m[2], yyyy = m[3];
+      return `${yyyy}-${mm}-${dd}`;
     }
-
-    function formatClock(min){
-      const m = ((min % 1440) + 1440) % 1440;
-      const hh = Math.floor(m / 60);
-      const mm = m % 60;
-      return `${pad2(hh)}:${pad2(mm)}`;
+    m = s.match(/^\s*(\d{4})-(\d{2})-(\d{2})\s*$/);
+    if(m){
+      return `${m[1]}-${m[2]}-${m[3]}`;
     }
-
-    function weekdayTitleFromISO(iso){
-      const dt = new Date(iso + 'T00:00:00');
-      const weekday = new Intl.DateTimeFormat('de-DE', { weekday:'long' }).format(dt);
-      const date = new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).format(dt);
-      return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} · ${date}`;
+    if(typeof value === 'number' && Number.isFinite(value)){
+      const dt = new Date(Math.round((value - 25569) * 86400 * 1000));
+      const yyyy = dt.getUTCFullYear();
+      const mm = pad2(dt.getUTCMonth()+1);
+      const dd = pad2(dt.getUTCDate());
+      return `${yyyy}-${mm}-${dd}`;
     }
+    return null;
+  }
 
-    function todayTitle(){
-      const now = new Date();
-      const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(now);
-      const date = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now);
-      return `${weekday.charAt(0).toUpperCase() + weekday.slice(1)} · ${date}`;
+  function uid(){ return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+
+  function loadDays(){
+    try{
+      const raw = localStorage.getItem(STORAGE_DAYS);
+      if(!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    }catch{ return []; }
+  }
+
+  function saveDays(days){ localStorage.setItem(STORAGE_DAYS, JSON.stringify(days)); }
+
+  function loadSettings(){
+    try{
+      const raw = localStorage.getItem(STORAGE_SETTINGS);
+      if(!raw) return { hourlyRate: null };
+      const parsed = JSON.parse(raw);
+      return { hourlyRate: (typeof parsed?.hourlyRate === 'number' ? parsed.hourlyRate : null) };
+    }catch{ return { hourlyRate: null }; }
+  }
+
+  function saveSettings(s){ localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(s)); }
+
+  function durationMin(day){
+    const s = day.startMin ?? 0;
+    const e = day.endMin ?? 0;
+    let diff = e - s;
+    if(diff < 0) diff += 1440;
+    return diff;
+  }
+
+  function netMin(day){
+    const dur = durationMin(day);
+    return Math.max(0, dur - (day.breakMin || 0));
+  }
+
+  function moneyForMinutes(minutes, hourlyRate){
+    if(!(typeof hourlyRate === 'number') || !Number.isFinite(hourlyRate)) return 0;
+    return (minutes / 60) * hourlyRate;
+  }
+
+  function updateSubtitle(){
+    const { hourlyRate } = loadSettings();
+    if(typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)){
+      elSubtitle.textContent = `Stundenlohn: ${fmtEUR.format(hourlyRate)} · lokal gespeichert`;
+    }else{
+      elSubtitle.textContent = 'Minimal. Präzise. Unter Kontrolle.';
     }
+  }
 
-    function todayISO(){
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = pad2(d.getMonth()+1);
-      const day = pad2(d.getDate());
-      return `${y}-${m}-${day}`;
-    }
+  // =========================
+  // ✅ NEU: Edit-Mode State
+  // =========================
+  let editingId = null;     // wenn gesetzt => wir überschreiben diesen Eintrag
+  let editingISO = null;    // Datum des Eintrags (bleibt beim Edit gleich)
 
-    function showError(el, msg){ el.textContent = msg; el.style.display = 'block'; }
-    function clearError(el){ el.textContent = ''; el.style.display = 'none'; }
+  function setDialogMode({ isEdit, titleText, subtitleText }){
+    document.getElementById('dlgTitle').textContent = titleText;
+    document.getElementById('dlgSubtitle').textContent = subtitleText;
 
-    function parseHHMM(str, { allowEmpty=false } = {}){
-      const s = String(str ?? '').trim();
-      if(!s){ return allowEmpty ? 0 : null; }
-      const normalized = s.replace('.', ':');
-      const m = normalized.match(/^\s*(\d{1,2})\s*:\s*(\d{1,2})\s*$/);
-      if(!m) return null;
-      const hh = Number(m[1]);
-      const mm = Number(m[2]);
-      if(!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-      if(hh < 0 || hh > 23) return null;
-      if(mm < 0 || mm > 59) return null;
-      return (hh * 60) + mm;
-    }
+    // Optionaler Delete-Button im Dialog-Footer (nur im Edit-Modus)
+    const foot = dlg.querySelector('.dlg-foot');
+    let delBtn = document.getElementById('btnDeleteInDialog');
 
-    function parseMoney(str){
-      const raw = String(str ?? '').trim();
-      if(!raw) return null;
-      const normalized = raw.replace(/\s/g,'').replace(',', '.');
-      const v = Number(normalized);
-      if(!Number.isFinite(v) || v < 0) return null;
-      return v;
-    }
+    if(isEdit){
+      if(!delBtn){
+        delBtn = document.createElement('button');
+        delBtn.id = 'btnDeleteInDialog';
+        delBtn.type = 'button';
+        delBtn.className = 'btn secondary';
+        delBtn.innerHTML = `<span class="icon" aria-hidden="true">🗑</span> Löschen`;
+        // links im Footer platzieren
+        foot.insertBefore(delBtn, foot.firstChild);
 
-    function parseDateDE(value){
-      const s = String(value ?? '').trim();
-      if(!s) return null;
-      let m = s.match(/^\s*(\d{2})[.\-\/](\d{2})[.\-\/](\d{4})\s*$/);
-      if(m){
-        const dd = m[1], mm = m[2], yyyy = m[3];
-        return `${yyyy}-${mm}-${dd}`;
+        delBtn.addEventListener('click', () => {
+          if(!editingId) return;
+          const ok = confirm('Diesen Eintrag wirklich löschen?');
+          if(!ok) return;
+          const cur = loadDays().filter(x => x.id !== editingId);
+          saveDays(cur);
+          closeDialog(dlg);
+          editingId = null;
+          editingISO = null;
+          render();
+        });
       }
-      m = s.match(/^\s*(\d{4})-(\d{2})-(\d{2})\s*$/);
-      if(m){
-        return `${m[1]}-${m[2]}-${m[3]}`;
+      delBtn.style.display = 'inline-flex';
+    }else{
+      if(delBtn) delBtn.style.display = 'none';
+    }
+  }
+
+  function render(){
+    const days = loadDays();
+    const { hourlyRate } = loadSettings();
+
+    days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
+
+    const totalNetMin = days.reduce((acc, d) => acc + netMin(d), 0);
+    const totalMoney = moneyForMinutes(totalNetMin, hourlyRate);
+
+    elSum.textContent = formatMinutes(totalNetMin);
+    elSumMoney.textContent = fmtEUR.format(totalMoney);
+
+    elDays.innerHTML = '';
+    if(days.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = `Noch keine Einträge.<br/>Tippe auf <strong>＋</strong>, um deinen ersten Arbeitstag zu speichern.`;
+      elDays.appendChild(empty);
+      return;
+    }
+
+    const groups = new Map();
+    for(const d of days){
+      const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(d);
+    }
+    const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
+
+    for(const key of keys){
+      const list = groups.get(key) || [];
+
+      let monthName = 'Unbekannter Monat';
+      if(key !== '0000-00'){
+        const dt = new Date(`${key}-01T00:00:00`);
+        monthName = fmtMonth.format(dt);
+        monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
       }
-      if(typeof value === 'number' && Number.isFinite(value)){
-        const dt = new Date(Math.round((value - 25569) * 86400 * 1000));
-        const yyyy = dt.getUTCFullYear();
-        const mm = pad2(dt.getUTCMonth()+1);
-        const dd = pad2(dt.getUTCDate());
-        return `${yyyy}-${mm}-${dd}`;
+
+      const monthNetMin = list.reduce((acc, d) => acc + netMin(d), 0);
+      const monthMoney = moneyForMinutes(monthNetMin, hourlyRate);
+
+      const month = document.createElement('div');
+      month.className = 'month';
+
+      const head = document.createElement('div');
+      head.className = 'month-head';
+
+      const title = document.createElement('div');
+      title.className = 'month-title';
+      title.innerHTML = `<div class="name">${monthName}</div><div class="sub">${list.length} Eintrag${list.length===1?'':'e'}</div>`;
+
+      const sums = document.createElement('div');
+      sums.className = 'month-sums';
+
+      const chipNet = document.createElement('div');
+      chipNet.className = 'chip ok';
+      chipNet.textContent = `Netto ${formatMinutes(monthNetMin)}`;
+      sums.appendChild(chipNet);
+
+      const chipMoney = document.createElement('div');
+      chipMoney.className = 'chip money';
+      chipMoney.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
+        ? fmtEUR.format(monthMoney)
+        : '€ —';
+      sums.appendChild(chipMoney);
+
+      head.appendChild(title);
+      head.appendChild(sums);
+
+      const monthDays = document.createElement('div');
+      monthDays.className = 'month-days';
+
+      for(const d of list){
+        const dur = durationMin(d);
+        const net = netMin(d);
+        const money = moneyForMinutes(net, hourlyRate);
+
+        const item = document.createElement('div');
+        item.className = 'day';
+
+        const left = document.createElement('div');
+        left.className = 'day-title';
+
+        const t = document.createElement('div');
+        t.className = 'date';
+        t.textContent = d.title || weekdayTitleFromISO(d.isoDate || todayISO());
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `${formatClock(d.startMin ?? 0)}–${formatClock(d.endMin ?? 0)} · Dauer ${formatMinutes(dur)} · Pause ${formatMinutes(d.breakMin || 0)}`;
+
+        left.appendChild(t);
+        left.appendChild(meta);
+
+        const right = document.createElement('div');
+        right.className = 'rightcol';
+
+        const badgeNet = document.createElement('div');
+        badgeNet.className = 'badge ok';
+        badgeNet.textContent = `Netto ${formatMinutes(net)}`;
+
+        const badgeMoney = document.createElement('div');
+        badgeMoney.className = 'badge money';
+        badgeMoney.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
+          ? fmtEUR.format(money)
+          : '€ — (Stundenlohn)';
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'btn secondary';
+        del.style.padding = '10px 12px';
+        del.style.borderRadius = '14px';
+        del.style.fontSize = '12px';
+        del.style.boxShadow = 'none';
+        del.style.background = 'rgba(255,255,255,0.05)';
+        del.innerHTML = `<span class="icon" aria-hidden="true">🗑</span> Löschen`;
+        del.addEventListener('click', (e) => {
+          e.stopPropagation(); // ✅ wichtig: sonst würde auch Edit öffnen
+          const ok = confirm('Diesen Eintrag wirklich löschen?');
+          if(!ok) return;
+          const cur = loadDays().filter(x => x.id !== d.id);
+          saveDays(cur);
+          render();
+        });
+
+        // ✅ NEU: Klick auf Card => bearbeiten
+        item.addEventListener('click', () => openDialogEditWorkday(d));
+
+        right.appendChild(badgeNet);
+        right.appendChild(badgeMoney);
+        right.appendChild(del);
+
+        item.appendChild(left);
+        item.appendChild(right);
+
+        monthDays.appendChild(item);
       }
-      return null;
+
+      month.appendChild(head);
+      month.appendChild(monthDays);
+      elDays.appendChild(month);
     }
+  }
 
-    function uid(){ return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }
+  function openDialog(d){
+    if(typeof d.showModal === 'function') d.showModal();
+    else d.setAttribute('open','');
+  }
+  function closeDialog(d){
+    if(typeof d.close === 'function') d.close();
+    else d.removeAttribute('open');
+  }
 
-    function loadDays(){
-      try{
-        const raw = localStorage.getItem(STORAGE_DAYS);
-        if(!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-      }catch{ return []; }
-    }
+  function openDialogWorkday(){
+    clearError(elError);
+    editingId = null;
+    editingISO = null;
 
-    function saveDays(days){ localStorage.setItem(STORAGE_DAYS, JSON.stringify(days)); }
+    elStart.value='';
+    elEnd.value='';
+    elBreak.value='';
 
-    function loadSettings(){
-      try{
-        const raw = localStorage.getItem(STORAGE_SETTINGS);
-        if(!raw) return { hourlyRate: null };
-        const parsed = JSON.parse(raw);
-        return { hourlyRate: (typeof parsed?.hourlyRate === 'number' ? parsed.hourlyRate : null) };
-      }catch{ return { hourlyRate: null }; }
-    }
+    setDialogMode({
+      isEdit: false,
+      titleText: todayTitle(),
+      subtitleText: 'Start/Ende & Pause eintragen (Format hh:mm). Über Mitternacht ist erlaubt.'
+    });
 
-    function saveSettings(s){ localStorage.setItem(STORAGE_SETTINGS, JSON.stringify(s)); }
+    openDialog(dlg);
+    setTimeout(()=>elStart.focus(), 60);
+  }
 
-    function durationMin(day){
-      const s = day.startMin ?? 0;
-      const e = day.endMin ?? 0;
-      let diff = e - s;
-      if(diff < 0) diff += 1440;
-      return diff;
-    }
+  // ✅ NEU: Edit-Dialog öffnen
+  function openDialogEditWorkday(day){
+    clearError(elError);
+    editingId = day.id;
+    editingISO = day.isoDate || todayISO();
 
-    function netMin(day){
-      const dur = durationMin(day);
-      return Math.max(0, dur - (day.breakMin || 0));
-    }
+    elStart.value = formatClock(day.startMin ?? 0);
+    elEnd.value   = formatClock(day.endMin ?? 0);
+    elBreak.value = formatClock(day.breakMin || 0);
 
-    function moneyForMinutes(minutes, hourlyRate){
-      if(!(typeof hourlyRate === 'number') || !Number.isFinite(hourlyRate)) return 0;
-      return (minutes / 60) * hourlyRate;
-    }
+    setDialogMode({
+      isEdit: true,
+      titleText: (day.title || weekdayTitleFromISO(editingISO)) + ' · Bearbeiten',
+      subtitleText: 'Änderungen werden überschrieben und lokal gespeichert.'
+    });
 
-    function updateSubtitle(){
-      const { hourlyRate } = loadSettings();
-      if(typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)){
-        elSubtitle.textContent = `Stundenlohn: ${fmtEUR.format(hourlyRate)} · lokal gespeichert`;
+    openDialog(dlg);
+    setTimeout(()=>elStart.focus(), 60);
+  }
+
+  function saveWorkday(){
+    clearError(elError);
+
+    const startMin = parseHHMM(elStart.value, { allowEmpty:false });
+    const endMin = parseHHMM(elEnd.value, { allowEmpty:false });
+    const breakMin = parseHHMM(elBreak.value, { allowEmpty:true });
+
+    if(startMin === null) return showError(elError, 'Bitte gib eine gültige Startzeit im Format hh:mm ein (z.B. 08:00).');
+    if(endMin === null) return showError(elError, 'Bitte gib eine gültige Endzeit im Format hh:mm ein (z.B. 16:30).');
+    if(breakMin === null) return showError(elError, 'Bitte gib eine gültige Pausenzeit im Format hh:mm ein (z.B. 00:30).');
+
+    let dur = endMin - startMin;
+    if(dur < 0) dur += 1440;
+    if(dur === 0) return showError(elError, 'Start und Ende ergeben 0 Minuten. Beispiel Nachtschicht: 22:00–06:00.');
+    if(breakMin > dur) return showError(elError, 'Die Pausenzeit kann nicht größer sein als die (berechnete) Arbeitsdauer.');
+
+    const iso = editingISO || todayISO();
+
+    const days = loadDays();
+
+    // ✅ NEU: Update statt Push, wenn editingId gesetzt ist
+    if(editingId){
+      const idx = days.findIndex(x => x.id === editingId);
+      if(idx === -1){
+        // Fallback: falls nicht gefunden, als neuen Eintrag speichern
+        days.push({
+          id: editingId,
+          isoDate: iso,
+          title: weekdayTitleFromISO(iso),
+          startMin,
+          endMin,
+          breakMin,
+        });
       }else{
-        elSubtitle.textContent = 'Minimal. Präzise. Unter Kontrolle.';
+        days[idx] = {
+          ...days[idx],
+          isoDate: iso,
+          title: weekdayTitleFromISO(iso),
+          startMin,
+          endMin,
+          breakMin,
+        };
       }
-    }
-
-    function render(){
-      const days = loadDays();
-      const { hourlyRate } = loadSettings();
-
-      days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
-
-      const totalNetMin = days.reduce((acc, d) => acc + netMin(d), 0);
-      const totalMoney = moneyForMinutes(totalNetMin, hourlyRate);
-
-      elSum.textContent = formatMinutes(totalNetMin);
-      elSumMoney.textContent = fmtEUR.format(totalMoney);
-
-      elDays.innerHTML = '';
-      if(days.length === 0){
-        const empty = document.createElement('div');
-        empty.className = 'empty';
-        empty.innerHTML = `Noch keine Einträge.<br/>Tippe auf <strong>＋</strong>, um deinen ersten Arbeitstag zu speichern.`;
-        elDays.appendChild(empty);
-        return;
-      }
-
-      const groups = new Map();
-      for(const d of days){
-        const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
-        if(!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(d);
-      }
-      const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
-
-      for(const key of keys){
-        const list = groups.get(key) || [];
-
-        let monthName = 'Unbekannter Monat';
-        if(key !== '0000-00'){
-          const dt = new Date(`${key}-01T00:00:00`);
-          monthName = fmtMonth.format(dt);
-          monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        }
-
-        const monthNetMin = list.reduce((acc, d) => acc + netMin(d), 0);
-        const monthMoney = moneyForMinutes(monthNetMin, hourlyRate);
-
-        const month = document.createElement('div');
-        month.className = 'month';
-
-        const head = document.createElement('div');
-        head.className = 'month-head';
-
-        const title = document.createElement('div');
-        title.className = 'month-title';
-        title.innerHTML = `<div class="name">${monthName}</div><div class="sub">${list.length} Eintrag${list.length===1?'':'e'}</div>`;
-
-        const sums = document.createElement('div');
-        sums.className = 'month-sums';
-
-        const chipNet = document.createElement('div');
-        chipNet.className = 'chip ok';
-        chipNet.textContent = `Netto ${formatMinutes(monthNetMin)}`;
-        sums.appendChild(chipNet);
-
-        const chipMoney = document.createElement('div');
-        chipMoney.className = 'chip money';
-        chipMoney.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
-          ? fmtEUR.format(monthMoney)
-          : '€ —';
-        sums.appendChild(chipMoney);
-
-        head.appendChild(title);
-        head.appendChild(sums);
-
-        const monthDays = document.createElement('div');
-        monthDays.className = 'month-days';
-
-        for(const d of list){
-          const dur = durationMin(d);
-          const net = netMin(d);
-          const money = moneyForMinutes(net, hourlyRate);
-
-          const item = document.createElement('div');
-          item.className = 'day';
-
-          const left = document.createElement('div');
-          left.className = 'day-title';
-
-          const t = document.createElement('div');
-          t.className = 'date';
-          t.textContent = d.title || weekdayTitleFromISO(d.isoDate || todayISO());
-
-          const meta = document.createElement('div');
-          meta.className = 'meta';
-          meta.textContent = `${formatClock(d.startMin ?? 0)}–${formatClock(d.endMin ?? 0)} · Dauer ${formatMinutes(dur)} · Pause ${formatMinutes(d.breakMin || 0)}`;
-
-          left.appendChild(t);
-          left.appendChild(meta);
-
-          const right = document.createElement('div');
-          right.className = 'rightcol';
-
-          const badgeNet = document.createElement('div');
-          badgeNet.className = 'badge ok';
-          badgeNet.textContent = `Netto ${formatMinutes(net)}`;
-
-          const badgeMoney = document.createElement('div');
-          badgeMoney.className = 'badge money';
-          badgeMoney.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
-            ? fmtEUR.format(money)
-            : '€ — (Stundenlohn)';
-
-          const del = document.createElement('button');
-          del.type = 'button';
-          del.className = 'btn secondary';
-          del.style.padding = '10px 12px';
-          del.style.borderRadius = '14px';
-          del.style.fontSize = '12px';
-          del.style.boxShadow = 'none';
-          del.style.background = 'rgba(255,255,255,0.05)';
-          del.innerHTML = `<span class="icon" aria-hidden="true">🗑</span> Löschen`;
-          del.addEventListener('click', () => {
-            const ok = confirm('Diesen Eintrag wirklich löschen?');
-            if(!ok) return;
-            const cur = loadDays().filter(x => x.id !== d.id);
-            saveDays(cur);
-            render();
-          });
-
-          right.appendChild(badgeNet);
-          right.appendChild(badgeMoney);
-          right.appendChild(del);
-
-          item.appendChild(left);
-          item.appendChild(right);
-
-          monthDays.appendChild(item);
-        }
-
-        month.appendChild(head);
-        month.appendChild(monthDays);
-        elDays.appendChild(month);
-      }
-    }
-
-    function openDialog(d){
-      if(typeof d.showModal === 'function') d.showModal();
-      else d.setAttribute('open','');
-    }
-    function closeDialog(d){
-      if(typeof d.close === 'function') d.close();
-      else d.removeAttribute('open');
-    }
-
-    function openDialogWorkday(){
-      clearError(elError);
-      elStart.value='';
-      elEnd.value='';
-      elBreak.value='';
-      document.getElementById('dlgTitle').textContent = todayTitle();
-      document.getElementById('dlgSubtitle').textContent = 'Start/Ende & Pause eintragen (Format hh:mm). Über Mitternacht ist erlaubt.';
-      openDialog(dlg);
-      setTimeout(()=>elStart.focus(), 60);
-    }
-
-    function saveWorkday(){
-      clearError(elError);
-
-      const startMin = parseHHMM(elStart.value, { allowEmpty:false });
-      const endMin = parseHHMM(elEnd.value, { allowEmpty:false });
-      const breakMin = parseHHMM(elBreak.value, { allowEmpty:true });
-
-      if(startMin === null) return showError(elError, 'Bitte gib eine gültige Startzeit im Format hh:mm ein (z.B. 08:00).');
-      if(endMin === null) return showError(elError, 'Bitte gib eine gültige Endzeit im Format hh:mm ein (z.B. 16:30).');
-      if(breakMin === null) return showError(elError, 'Bitte gib eine gültige Pausenzeit im Format hh:mm ein (z.B. 00:30).');
-
-      let dur = endMin - startMin;
-      if(dur < 0) dur += 1440;
-      if(dur === 0) return showError(elError, 'Start und Ende ergeben 0 Minuten. Beispiel Nachtschicht: 22:00–06:00.');
-      if(breakMin > dur) return showError(elError, 'Die Pausenzeit kann nicht größer sein als die (berechnete) Arbeitsdauer.');
-
-      const iso = todayISO();
+    }else{
       const day = {
         id: uid(),
         isoDate: iso,
@@ -1013,384 +1114,396 @@
         endMin,
         breakMin,
       };
-
-      const days = loadDays();
       days.push(day);
-      saveDays(days);
-      closeDialog(dlg);
-      render();
     }
 
-    function resetAll(){
-      const ok = confirm('Wirklich alle Einträge löschen?');
-      if(!ok) return;
-      localStorage.removeItem(STORAGE_DAYS);
-      render();
-    }
+    saveDays(days);
+    closeDialog(dlg);
 
-    function openSettings(){
-      clearError(elErrorSettings);
-      const { hourlyRate } = loadSettings();
-      elHourly.value = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? String(hourlyRate).replace('.', ',') : '';
-      elHourlyNote.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
-        ? `Aktuell: ${fmtEUR.format(hourlyRate)} pro Stunde`
-        : 'Aktuell: — (nicht gesetzt)';
-      importFile.value = '';
-      openDialog(dlgSettings);
-      setTimeout(()=>elHourly.focus(), 60);
-    }
+    // Reset Edit-Mode
+    editingId = null;
+    editingISO = null;
 
-    function saveSettingsFromDialog(){
-      clearError(elErrorSettings);
-      const v = elHourly.value.trim();
-      if(!v){
-        saveSettings({ hourlyRate: null });
-        closeDialog(dlgSettings);
-        updateSubtitle();
-        render();
-        return;
-      }
-      const hourlyRate = parseMoney(v);
-      if(hourlyRate === null) return showError(elErrorSettings, 'Bitte gib einen gültigen Stundenlohn ein (z.B. 18,50).');
-      if(hourlyRate > 1000) return showError(elErrorSettings, 'Das wirkt sehr hoch – falls korrekt, trage es ohne Sonderzeichen ein (z.B. 1200).');
+    render();
+  }
 
-      saveSettings({ hourlyRate });
+  function resetAll(){
+    const ok = confirm('Wirklich alle Einträge löschen?');
+    if(!ok) return;
+    localStorage.removeItem(STORAGE_DAYS);
+    render();
+  }
+
+  function openSettings(){
+    clearError(elErrorSettings);
+    const { hourlyRate } = loadSettings();
+    elHourly.value = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? String(hourlyRate).replace('.', ',') : '';
+    elHourlyNote.textContent = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate))
+      ? `Aktuell: ${fmtEUR.format(hourlyRate)} pro Stunde`
+      : 'Aktuell: — (nicht gesetzt)';
+    importFile.value = '';
+    openDialog(dlgSettings);
+    setTimeout(()=>elHourly.focus(), 60);
+  }
+
+  function saveSettingsFromDialog(){
+    clearError(elErrorSettings);
+    const v = elHourly.value.trim();
+    if(!v){
+      saveSettings({ hourlyRate: null });
       closeDialog(dlgSettings);
       updateSubtitle();
       render();
+      return;
+    }
+    const hourlyRate = parseMoney(v);
+    if(hourlyRate === null) return showError(elErrorSettings, 'Bitte gib einen gültigen Stundenlohn ein (z.B. 18,50).');
+    if(hourlyRate > 1000) return showError(elErrorSettings, 'Das wirkt sehr hoch – falls korrekt, trage es ohne Sonderzeichen ein (z.B. 1200).');
+
+    saveSettings({ hourlyRate });
+    closeDialog(dlgSettings);
+    updateSubtitle();
+    render();
+  }
+
+  function smartTimeInput(el){
+    el.addEventListener('input', () => {
+      const digits = el.value.replace(/[^0-9]/g, '');
+      if(digits.length <= 2){ el.value = digits; return; }
+      const hh = digits.slice(0,2);
+      const mm = digits.slice(2,4);
+      el.value = mm.length ? `${hh}:${mm}` : `${hh}:`;
+    });
+  }
+
+  // ===== Export/Import: unverändert aus deinem Code =====
+  function exportXLSX(){
+    clearError(elErrorSettings);
+
+    const XLSX = window.XLSX;
+    if(!XLSX){
+      return showError(elErrorSettings, 'Export-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
     }
 
-    function smartTimeInput(el){
-      el.addEventListener('input', () => {
-        const digits = el.value.replace(/[^0-9]/g, '');
-        if(digits.length <= 2){ el.value = digits; return; }
-        const hh = digits.slice(0,2);
-        const mm = digits.slice(2,4);
-        el.value = mm.length ? `${hh}:${mm}` : `${hh}:`;
-      });
+    const days = loadDays();
+    const { hourlyRate } = loadSettings();
+
+    if(days.length === 0){
+      return showError(elErrorSettings, 'Keine Daten zum Exportieren vorhanden.');
     }
 
-    function exportXLSX(){
-      clearError(elErrorSettings);
+    days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
 
-      const XLSX = window.XLSX;
-      if(!XLSX){
-        return showError(elErrorSettings, 'Export-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
+    const groups = new Map();
+    for(const d of days){
+      const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(d);
+    }
+    const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
+
+    const fmtDate = (iso) => {
+      if(!iso || iso.length < 10) return '';
+      const dt = new Date(iso + 'T00:00:00');
+      return new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).format(dt);
+    };
+    const fmtWeekday = (iso) => {
+      if(!iso || iso.length < 10) return '';
+      const dt = new Date(iso + 'T00:00:00');
+      const w = new Intl.DateTimeFormat('de-DE', { weekday:'long' }).format(dt);
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    };
+
+    const rows = [];
+    rows.push([
+      'Monat', 'Datum', 'Wochentag', 'Start', 'Ende', 'Zeitspanne', 'Pause', 'Dauer', 'Netto', 'Stundenlohn', 'Einkommen'
+    ]);
+
+    const summaryRows = [];
+    summaryRows.push(['Monat', 'Einträge', 'Netto (hh:mm)', 'Netto (Stunden)', 'Stundenlohn', 'Einkommen']);
+
+    for(const key of keys){
+      const list = groups.get(key) || [];
+      let monthNetMin = 0;
+
+      let monthName = 'Unbekannter Monat';
+      if(key !== '0000-00'){
+        const dt = new Date(`${key}-01T00:00:00`);
+        monthName = fmtMonth.format(dt);
+        monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
       }
 
-      const days = loadDays();
-      const { hourlyRate } = loadSettings();
+      rows.push(['']);
+      rows.push([monthName]);
 
-      if(days.length === 0){
-        return showError(elErrorSettings, 'Keine Daten zum Exportieren vorhanden.');
-      }
+      for(const d of list){
+        const dur = durationMin(d);
+        const net = netMin(d);
+        monthNetMin += net;
 
-      days.sort((a,b) => (b.isoDate || '').localeCompare(a.isoDate || '') || String(b.id).localeCompare(String(a.id)));
+        const span = `${formatClock(d.startMin ?? 0)}–${formatClock(d.endMin ?? 0)}`;
+        const income = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? moneyForMinutes(net, hourlyRate) : '';
 
-      const groups = new Map();
-      for(const d of days){
-        const key = (d.isoDate && String(d.isoDate).length >= 7) ? String(d.isoDate).slice(0,7) : '0000-00';
-        if(!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(d);
-      }
-      const keys = Array.from(groups.keys()).sort((a,b) => b.localeCompare(a));
-
-      const fmtDate = (iso) => {
-        if(!iso || iso.length < 10) return '';
-        const dt = new Date(iso + 'T00:00:00');
-        return new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }).format(dt);
-      };
-      const fmtWeekday = (iso) => {
-        if(!iso || iso.length < 10) return '';
-        const dt = new Date(iso + 'T00:00:00');
-        const w = new Intl.DateTimeFormat('de-DE', { weekday:'long' }).format(dt);
-        return w.charAt(0).toUpperCase() + w.slice(1);
-      };
-
-      const rows = [];
-      rows.push([
-        'Monat', 'Datum', 'Wochentag', 'Start', 'Ende', 'Zeitspanne', 'Pause', 'Dauer', 'Netto', 'Stundenlohn', 'Einkommen'
-      ]);
-
-      const summaryRows = [];
-      summaryRows.push(['Monat', 'Einträge', 'Netto (hh:mm)', 'Netto (Stunden)', 'Stundenlohn', 'Einkommen']);
-
-      for(const key of keys){
-        const list = groups.get(key) || [];
-        let monthNetMin = 0;
-
-        let monthName = 'Unbekannter Monat';
-        if(key !== '0000-00'){
-          const dt = new Date(`${key}-01T00:00:00`);
-          monthName = fmtMonth.format(dt);
-          monthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        }
-
-        rows.push(['']);
-        rows.push([monthName]);
-
-        for(const d of list){
-          const dur = durationMin(d);
-          const net = netMin(d);
-          monthNetMin += net;
-
-          const span = `${formatClock(d.startMin ?? 0)}–${formatClock(d.endMin ?? 0)}`;
-          const income = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? moneyForMinutes(net, hourlyRate) : '';
-
-          rows.push([
-            monthName,
-            fmtDate(d.isoDate),
-            fmtWeekday(d.isoDate),
-            formatClock(d.startMin ?? 0),
-            formatClock(d.endMin ?? 0),
-            span,
-            formatMinutes(d.breakMin || 0),
-            formatMinutes(dur),
-            formatMinutes(net),
-            (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? hourlyRate : '',
-            income
-          ]);
-        }
-
-        const monthIncome = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? moneyForMinutes(monthNetMin, hourlyRate) : '';
-        summaryRows.push([
+        rows.push([
           monthName,
-          list.length,
-          formatMinutes(monthNetMin),
-          monthNetMin / 60,
+          fmtDate(d.isoDate),
+          fmtWeekday(d.isoDate),
+          formatClock(d.startMin ?? 0),
+          formatClock(d.endMin ?? 0),
+          span,
+          formatMinutes(d.breakMin || 0),
+          formatMinutes(dur),
+          formatMinutes(net),
           (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? hourlyRate : '',
-          monthIncome
+          income
         ]);
       }
 
-      const wb = XLSX.utils.book_new();
-
-      const ws1 = XLSX.utils.aoa_to_sheet(rows);
-      ws1['!cols'] = [
-        { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 8 }, { wch: 9 }, { wch: 9 }, { wch: 11 }, { wch: 12 }
-      ];
-      XLSX.utils.book_append_sheet(wb, ws1, 'Arbeitstage');
-
-      const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
-      ws2['!cols'] = [
-        { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }
-      ];
-      XLSX.utils.book_append_sheet(wb, ws2, 'Monate');
-
-      const now = new Date();
-      const dd = pad2(now.getDate());
-      const mm = pad2(now.getMonth()+1);
-      const yyyy = now.getFullYear();
-      const fileName = `export_azt_${dd}-${mm}-${yyyy}.xlsx`;
-
-      XLSX.writeFile(wb, fileName);
+      const monthIncome = (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? moneyForMinutes(monthNetMin, hourlyRate) : '';
+      summaryRows.push([
+        monthName,
+        list.length,
+        formatMinutes(monthNetMin),
+        monthNetMin / 60,
+        (typeof hourlyRate === 'number' && Number.isFinite(hourlyRate)) ? hourlyRate : '',
+        monthIncome
+      ]);
     }
 
-    function normalizeImportedDays(imported){
-      const seen = new Set();
-      const out = [];
-      for(const d of imported){
-        const key = `${d.isoDate}|${d.startMin}|${d.endMin}|${d.breakMin||0}`;
-        if(seen.has(key)) continue;
-        seen.add(key);
-        out.push(d);
-      }
-      return out;
+    const wb = XLSX.utils.book_new();
+
+    const ws1 = XLSX.utils.aoa_to_sheet(rows);
+    ws1['!cols'] = [
+      { wch: 18 }, { wch: 12 }, { wch: 12 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 8 }, { wch: 9 }, { wch: 9 }, { wch: 11 }, { wch: 12 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Arbeitstage');
+
+    const ws2 = XLSX.utils.aoa_to_sheet(summaryRows);
+    ws2['!cols'] = [
+      { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 14 }
+    ];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Monate');
+
+    const now = new Date();
+    const dd = pad2(now.getDate());
+    const mm = pad2(now.getMonth()+1);
+    const yyyy = now.getFullYear();
+    const fileName = `export_azt_${dd}-${mm}-${yyyy}.xlsx`;
+
+    XLSX.writeFile(wb, fileName);
+  }
+
+  function normalizeImportedDays(imported){
+    const seen = new Set();
+    const out = [];
+    for(const d of imported){
+      const key = `${d.isoDate}|${d.startMin}|${d.endMin}|${d.breakMin||0}`;
+      if(seen.has(key)) continue;
+      seen.add(key);
+      out.push(d);
     }
+    return out;
+  }
 
-    function findHeaderRow(aoa){
-      for(let r=0;r<Math.min(aoa.length, 40);r++){
-        const row = aoa[r].map(x => String(x||'').trim().toLowerCase());
-        if(row.includes('datum') && row.includes('start') && row.includes('ende')) return r;
-      }
-      return -1;
+  function findHeaderRow(aoa){
+    for(let r=0;r<Math.min(aoa.length, 40);r++){
+      const row = aoa[r].map(x => String(x||'').trim().toLowerCase());
+      if(row.includes('datum') && row.includes('start') && row.includes('ende')) return r;
     }
+    return -1;
+  }
 
-    function extractHourlyRateFromWorkbook(wb){
-      const XLSX = window.XLSX;
-      if(!XLSX) return null;
+  function extractHourlyRateFromWorkbook(wb){
+    const XLSX = window.XLSX;
+    if(!XLSX) return null;
 
-      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'monate');
-      if(sheetName){
-        const ws = wb.Sheets[sheetName];
-        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
-        if(aoa && aoa.length){
-          const headerIdx = findHeaderRow(aoa) !== -1 ? findHeaderRow(aoa) : 0;
-          const header = (aoa[headerIdx]||[]).map(x => String(x||'').trim().toLowerCase());
-          const col = header.indexOf('stundenlohn');
-          if(col !== -1){
-            for(let i=headerIdx+1;i<aoa.length;i++){
-              const v = aoa[i]?.[col];
-              if(typeof v === 'number' && Number.isFinite(v)) return v;
-              const parsed = parseMoney(v);
-              if(parsed !== null) return parsed;
-            }
-          }
-        }
-      }
-
-      const sheetName2 = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage');
-      if(sheetName2){
-        const ws = wb.Sheets[sheetName2];
-        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
-        const h = findHeaderRow(aoa);
-        if(h !== -1){
-          const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
-          const col = header.indexOf('stundenlohn');
-          if(col !== -1){
-            for(let i=h+1;i<aoa.length;i++){
-              const v = aoa[i]?.[col];
-              if(typeof v === 'number' && Number.isFinite(v)) return v;
-              const parsed = parseMoney(v);
-              if(parsed !== null) return parsed;
-            }
-          }
-        }
-      }
-
-      return null;
-    }
-
-    function importFromWorkbook(wb){
-      const XLSX = window.XLSX;
-      if(!XLSX) throw new Error('Import-Library nicht geladen');
-
-      const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage') || wb.SheetNames[0];
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'monate');
+    if(sheetName){
       const ws = wb.Sheets[sheetName];
       const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
-      if(!aoa || !aoa.length) throw new Error('Leere Datei');
-
-      const h = findHeaderRow(aoa);
-      if(h === -1) throw new Error('Konnte keine Header-Zeile finden (Datum/Start/Ende).');
-
-      const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
-      const col = {
-        date: header.indexOf('datum'),
-        start: header.indexOf('start'),
-        end: header.indexOf('ende'),
-        pause: header.indexOf('pause'),
-      };
-
-      if(col.date === -1 || col.start === -1 || col.end === -1){
-        throw new Error('Spalten fehlen (Datum/Start/Ende).');
-      }
-
-      const imported = [];
-      for(let r=h+1;r<aoa.length;r++){
-        const row = aoa[r] || [];
-        const rawDate = row[col.date];
-        const iso = parseDateDE(rawDate);
-        if(!iso) continue;
-
-        const startStr = row[col.start];
-        const endStr = row[col.end];
-        const pauseStr = col.pause !== -1 ? row[col.pause] : '';
-
-        const startMin = (typeof startStr === 'number') ? Math.round(startStr * 1440) : parseHHMM(startStr, { allowEmpty:false });
-        const endMin = (typeof endStr === 'number') ? Math.round(endStr * 1440) : parseHHMM(endStr, { allowEmpty:false });
-        const breakMin = (typeof pauseStr === 'number') ? Math.round(pauseStr * 1440) : parseHHMM(pauseStr, { allowEmpty:true });
-
-        if(startMin === null || endMin === null || breakMin === null) continue;
-
-        imported.push({
-          id: uid(),
-          isoDate: iso,
-          title: weekdayTitleFromISO(iso),
-          startMin,
-          endMin,
-          breakMin,
-        });
-      }
-
-      if(imported.length === 0) throw new Error('Keine gültigen Arbeitstage gefunden.');
-      return normalizeImportedDays(imported);
-    }
-
-    async function doImport(mode){
-      clearError(elErrorSettings);
-
-      const XLSX = window.XLSX;
-      if(!XLSX){
-        return showError(elErrorSettings, 'Import-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
-      }
-
-      const file = importFile.files && importFile.files[0];
-      if(!file){
-        return showError(elErrorSettings, 'Bitte wähle zuerst eine .xlsx Datei aus.');
-      }
-
-      try{
-        const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: 'array' });
-
-        const importedDays = importFromWorkbook(wb);
-
-        const importedRate = extractHourlyRateFromWorkbook(wb);
-        if(importedRate !== null){
-          const cur = loadSettings().hourlyRate;
-          if(cur === null || Math.abs(cur - importedRate) > 0.0001){
-            const ok = confirm(`Stundenlohn aus Datei übernehmen?\n\nDatei: ${importedRate} €/h\nAktuell: ${cur ?? '—'} €/h`);
-            if(ok){
-              saveSettings({ hourlyRate: importedRate });
-              updateSubtitle();
-            }
+      if(aoa && aoa.length){
+        const headerIdx = findHeaderRow(aoa) !== -1 ? findHeaderRow(aoa) : 0;
+        const header = (aoa[headerIdx]||[]).map(x => String(x||'').trim().toLowerCase());
+        const col = header.indexOf('stundenlohn');
+        if(col !== -1){
+          for(let i=headerIdx+1;i<aoa.length;i++){
+            const v = aoa[i]?.[col];
+            if(typeof v === 'number' && Number.isFinite(v)) return v;
+            const parsed = parseMoney(v);
+            if(parsed !== null) return parsed;
           }
         }
-
-        if(mode === 'replace'){
-          const ok = confirm(`Import (ersetzen): Dadurch werden deine aktuellen Einträge gelöscht und durch ${importedDays.length} Einträge aus der Datei ersetzt. Fortfahren?`);
-          if(!ok) return;
-          saveDays(importedDays);
-        } else {
-          const existing = loadDays();
-          const merged = normalizeImportedDays(existing.concat(importedDays));
-          saveDays(merged);
-        }
-
-        render();
-        importFile.value = '';
-        showError(elErrorSettings, `✅ Import erfolgreich (${importedDays.length} Einträge).`);
-        elErrorSettings.style.borderColor = 'rgba(110,231,183,0.28)';
-        elErrorSettings.style.background = 'rgba(110,231,183,0.10)';
-
-      } catch (e){
-        showError(elErrorSettings, `Import fehlgeschlagen: ${e?.message || e}`);
       }
     }
 
-    smartTimeInput(elStart);
-    smartTimeInput(elEnd);
-    smartTimeInput(elBreak);
+    const sheetName2 = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage');
+    if(sheetName2){
+      const ws = wb.Sheets[sheetName2];
+      const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+      const h = findHeaderRow(aoa);
+      if(h !== -1){
+        const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
+        const col = header.indexOf('stundenlohn');
+        if(col !== -1){
+          for(let i=h+1;i<aoa.length;i++){
+            const v = aoa[i]?.[col];
+            if(typeof v === 'number' && Number.isFinite(v)) return v;
+            const parsed = parseMoney(v);
+            if(parsed !== null) return parsed;
+          }
+        }
+      }
+    }
 
-    btnAddTop.addEventListener('click', openDialogWorkday);
-    btnFab.addEventListener('click', openDialogWorkday);
-    btnSave.addEventListener('click', saveWorkday);
-    btnReset.addEventListener('click', resetAll);
+    return null;
+  }
 
-    btnSettings.addEventListener('click', openSettings);
-    btnSaveSettings.addEventListener('click', saveSettingsFromDialog);
+  function importFromWorkbook(wb){
+    const XLSX = window.XLSX;
+    if(!XLSX) throw new Error('Import-Library nicht geladen');
 
-    btnExport.addEventListener('click', exportXLSX);
-    btnImportReplace.addEventListener('click', () => doImport('replace'));
-    btnImportMerge.addEventListener('click', () => doImport('merge'));
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase() === 'arbeitstage') || wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    if(!aoa || !aoa.length) throw new Error('Leere Datei');
 
-    document.getElementById('form').addEventListener('keydown', (e) => {
-      if(e.key === 'Enter'){ e.preventDefault(); saveWorkday(); }
-    });
+    const h = findHeaderRow(aoa);
+    if(h === -1) throw new Error('Konnte keine Header-Zeile finden (Datum/Start/Ende).');
 
-    document.getElementById('formSettings').addEventListener('keydown', (e) => {
-      if(e.key === 'Enter'){ e.preventDefault(); saveSettingsFromDialog(); }
-    });
+    const header = (aoa[h]||[]).map(x => String(x||'').trim().toLowerCase());
+    const col = {
+      date: header.indexOf('datum'),
+      start: header.indexOf('start'),
+      end: header.indexOf('ende'),
+      pause: header.indexOf('pause'),
+    };
 
-    dlg.addEventListener('close', () => clearError(elError));
-    dlgSettings.addEventListener('close', () => {
-      elErrorSettings.style.borderColor = 'rgba(251,113,133,0.28)';
-      elErrorSettings.style.background = 'rgba(251,113,133,0.10)';
-      clearError(elErrorSettings);
-    });
+    if(col.date === -1 || col.start === -1 || col.end === -1){
+      throw new Error('Spalten fehlen (Datum/Start/Ende).');
+    }
 
-    updateSubtitle();
-    render();
-  </script>
+    const imported = [];
+    for(let r=h+1;r<aoa.length;r++){
+      const row = aoa[r] || [];
+      const rawDate = row[col.date];
+      const iso = parseDateDE(rawDate);
+      if(!iso) continue;
+
+      const startStr = row[col.start];
+      const endStr = row[col.end];
+      const pauseStr = col.pause !== -1 ? row[col.pause] : '';
+
+      const startMin = (typeof startStr === 'number') ? Math.round(startStr * 1440) : parseHHMM(startStr, { allowEmpty:false });
+      const endMin = (typeof endStr === 'number') ? Math.round(endStr * 1440) : parseHHMM(endStr, { allowEmpty:false });
+      const breakMin = (typeof pauseStr === 'number') ? Math.round(pauseStr * 1440) : parseHHMM(pauseStr, { allowEmpty:true });
+
+      if(startMin === null || endMin === null || breakMin === null) continue;
+
+      imported.push({
+        id: uid(),
+        isoDate: iso,
+        title: weekdayTitleFromISO(iso),
+        startMin,
+        endMin,
+        breakMin,
+      });
+    }
+
+    if(imported.length === 0) throw new Error('Keine gültigen Arbeitstage gefunden.');
+    return normalizeImportedDays(imported);
+  }
+
+  async function doImport(mode){
+    clearError(elErrorSettings);
+
+    const XLSX = window.XLSX;
+    if(!XLSX){
+      return showError(elErrorSettings, 'Import-Library ist noch nicht geladen. Bitte warte 1–2 Sekunden und versuch es nochmal.');
+    }
+
+    const file = importFile.files && importFile.files[0];
+    if(!file){
+      return showError(elErrorSettings, 'Bitte wähle zuerst eine .xlsx Datei aus.');
+    }
+
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+
+      const importedDays = importFromWorkbook(wb);
+
+      const importedRate = extractHourlyRateFromWorkbook(wb);
+      if(importedRate !== null){
+        const cur = loadSettings().hourlyRate;
+        if(cur === null || Math.abs(cur - importedRate) > 0.0001){
+          const ok = confirm(`Stundenlohn aus Datei übernehmen?\n\nDatei: ${importedRate} €/h\nAktuell: ${cur ?? '—'} €/h`);
+          if(ok){
+            saveSettings({ hourlyRate: importedRate });
+            updateSubtitle();
+          }
+        }
+      }
+
+      if(mode === 'replace'){
+        const ok = confirm(`Import (ersetzen): Dadurch werden deine aktuellen Einträge gelöscht und durch ${importedDays.length} Einträge aus der Datei ersetzt. Fortfahren?`);
+        if(!ok) return;
+        saveDays(importedDays);
+      } else {
+        const existing = loadDays();
+        const merged = normalizeImportedDays(existing.concat(importedDays));
+        saveDays(merged);
+      }
+
+      render();
+      importFile.value = '';
+      showError(elErrorSettings, `✅ Import erfolgreich (${importedDays.length} Einträge).`);
+      elErrorSettings.style.borderColor = 'rgba(110,231,183,0.28)';
+      elErrorSettings.style.background = 'rgba(110,231,183,0.10)';
+
+    } catch (e){
+      showError(elErrorSettings, `Import fehlgeschlagen: ${e?.message || e}`);
+    }
+  }
+
+  smartTimeInput(elStart);
+  smartTimeInput(elEnd);
+  smartTimeInput(elBreak);
+
+  btnAddTop.addEventListener('click', openDialogWorkday);
+  btnFab.addEventListener('click', openDialogWorkday);
+  btnSave.addEventListener('click', saveWorkday);
+  btnReset.addEventListener('click', resetAll);
+
+  btnSettings.addEventListener('click', openSettings);
+  btnSaveSettings.addEventListener('click', saveSettingsFromDialog);
+
+  btnExport.addEventListener('click', exportXLSX);
+  btnImportReplace.addEventListener('click', () => doImport('replace'));
+  btnImportMerge.addEventListener('click', () => doImport('merge'));
+
+  document.getElementById('form').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); saveWorkday(); }
+  });
+
+  document.getElementById('formSettings').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); saveSettingsFromDialog(); }
+  });
+
+  dlg.addEventListener('close', () => {
+    clearError(elError);
+    // wenn jemand schließt ohne speichern, Edit-Mode resetten
+    editingId = null;
+    editingISO = null;
+  });
+
+  dlgSettings.addEventListener('close', () => {
+    elErrorSettings.style.borderColor = 'rgba(251,113,133,0.28)';
+    elErrorSettings.style.background = 'rgba(251,113,133,0.10)';
+    clearError(elErrorSettings);
+  });
+
+  updateSubtitle();
+  render();
+</script>
 </body>
 </html>
